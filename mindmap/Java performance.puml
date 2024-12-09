@@ -1,0 +1,118 @@
+@startmindmap
+*[#orange] Java性能调优实战
+    *[#pink] 1开篇词 | 怎样才能做好性能调优
+        *[#lightblue]_ 扎实的计算机基础
+        *[#lightblue]_ 习惯透过源码了解技术本质
+        *[#lightblue]_ 善于追问和总结
+    *[#pink] 2概述
+        *[#lightblue] 如何制定性能调优标准
+            *[#lightgreen] 为什么要做系统调优
+                *_ 解决性能问题
+            *[#lightgreen] 什么时候开始介入调优
+                *_ 项目开始时不必介入
+                *_ 开发时有效编码
+                *_ 完成时性能测试
+                *_ 上线后监控
+            *[#lightgreen] 资源
+                *_ CPU
+                *_ 内存
+                *_ 磁盘IO
+                *_ 网络
+                *_ 异常
+                *_ 数据库
+                *_ 锁竞争
+            *[#lightgreen] 性能指标
+                *[#lightgrey] 响应时间
+                    *_ 客户端响应时间
+                    *_ 网络响应时间
+                    *_ 服务端响应时间
+                    *_ 数据库响应时间
+                *[#lightgrey] 吞吐量TPS
+                    *[#lightyellow] 磁盘吞吐量
+                        *_ (IOPS)Input/Output Per second(随机读写能力)
+                        *_ 数据吞吐量(连续读写能力,视频网站)
+                    *[#lightyellow] 网络吞吐量
+                        *_ 带宽
+                        *_ CPU处理能力
+                        *_ 网卡
+                        *_ 防火墙
+                        *_ 外部接口
+                        *_ IO
+                *[#lightgrey] 计算机资源分配使用率(木桶短板效应)
+                    *_ CPU占有率(Top命令)
+                    *_ 内存使用率
+                    *_ 磁盘IO
+                    *_ 网络IO
+                *[#lightgrey] 负载承受能力
+                    *_ 随请求数上升,响应时间上升曲线
+                    *_ 大量报错
+                *[#lightgrey] 延伸
+                    *[#lightyellow] 系统负载和CPU占有率的区别
+                        *_ 系统负载代表单位时间内正在运行或等待的进程或线程数，代表了系统的繁忙程度\nCPU利用率则代表单位时间内一个线程或进程实时占用CPU的百分比\nIO密集型CPU占有率不高，负载高\nCPU密集型CPU占有率高，负载不高
+                    *[#lightyellow] QPS与TPS
+                        *_ 当一次用户操作只包含一个请求接口时，TPS和QPS没有区别。\n当用户的一次操作包含了多个服务请求时，TPS作为性能指标更具有代表性
+                    *[#lightyellow] 如何避免异常生成堆栈信息
+                        *_ 自定义异常继承RuntimeException\nRuntimeException构造函数有布尔参数writableStackTrace
+        *[#lightblue] 如何制定性能调优策略
+            *[#lightgreen] 测试
+                *[#lightgrey] 微基准性能测试
+                    *_ 针对单个接口/方法\n比如同步/异步实现
+                *[#lightgrey] 宏基准性能测试
+                    *_ 环境/场景/目标
+            *[#lightgreen] 问题
+                *_ 热身问题(JVM热点code优化)
+                *[#lightgrey] 测试结果不稳定
+                    *_ 网络波动/GC/其他进程\n多次测试取平均
+                *_ 应该尽量避免线上环境中一台机器部署多个JVM 的情况
+            *[#lightgreen] 性能测试结果
+                *_ 测试接口的平均、最大和最小吞吐量，响应时间
+                *_ 服务器的 CPU、内存、I/O、网络 IO 使用率
+                *_ JVM 的 GC 频率
+            *[#lightgreen] 根据结果调优
+                *[#lightgrey] 系统有异常的情况
+                    *_ CPU/内存/IO有异常\n查命令&查日志
+                    *_ JVM有异常\n查GC日志&查内存快照
+                *[#lightgrey] 系统无异常的情况
+                    *[#lightyellow] 优化code
+                    *[#lightyellow] 优化设计\neg:单例模式
+                    *[#lightyellow] 优化算法
+                    *[#lightyellow] 时间换空间
+                    *[#lightyellow] 空间换时间
+                    *[#lightyellow] 参数调优\neg:JVM参数设置
+            *[#lightgreen] 兜底策略
+                *_ 限流
+                *_ 智能横向扩容
+                *_ 提前扩容
+    *[#pink] 多线程性能调优
+    *[#pink] 设计模式调优
+    *[#pink] 实战演练
+left side
+    *[#pink] 3Java编程性能调优
+        *[#lightblue] String优化
+            *[#lightgreen] 超大字符串
+                *_ code中拼接会被compiler优化
+                *_ 循环中使用StringBuilder/StringBuffer(线程安全)
+            *[#lightgreen] String.intern节省空间
+                *_ twitter地址信息
+            *[#lightgreen] 慎用split方法\n可能导致回溯使CPU占用极高
+        *[#lightblue] 慎重使用regular expression
+            *_ 模式:贪婪/懒惰?/独占+
+            *[#lightgrey] 优化
+                *_ 少用贪婪，多用独占
+                *_ 减少分支选择
+                *_ 减少嵌套捕获,加prefix ?:
+        *[#lightblue] List
+            *_ always use ArrayList\n better initialize size
+        *[#lightblue] Stream
+            *_ 在并行处理操作中，Stream 对中间操作基本跟串行处理方式是一样的\n但在终结操作中，Stream 将结合 ForkJoin 框架对集合进行切片处理\nForkJoin 框架将每个切片的处理结果 Join 合并起来
+        *[#lightblue] HashMap
+            *[#lightgrey] 添加
+                *_ hashCode 高16位与低16位异或,尽量打乱hashCode真正参与运算的低16位
+                *_ (n-1)&hashCode
+            *[#lightgrey] 获取
+                *_ 链表转红黑树
+            *[#lightgrey] 扩容
+                *_ e.hash&oldCapacity结果0与其他分流;0在原位,其他在原Index+oldCapacity上
+    *[#pink] JVM性能监测及调优
+    *[#pink] 数据库性能调优
+@endmindmap

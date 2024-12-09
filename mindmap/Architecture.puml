@@ -1,0 +1,307 @@
+@startmindmap
+*[#orange] 架构基础\n判断和取舍
+    *[#pink] 1架构基础
+        *[#lightblue] 架构是什么
+            *[#lightgreen] 系统与子系统
+                *_ 关联/规则/能力
+                *_ level视角不同
+            *[#lightgreen] 模块Module与组件Component
+                *_ 模块关注业务能力
+                *_ 组件关心物理部署
+            *[#lightgreen] 框架与架构
+                *_ 框架关心规范
+                *_ 架构关心结构
+            *[#lightgreen] 4R架构
+                *_ Rank 层级\n自顶向下,逐级细化
+                *_ Role 角色
+                *_ Relation 关系
+                *_ Rule 协作规则
+        *[#lightblue] 架构历史
+            *_ 机器语言 1940前
+            *_ 汇编语言 40年代
+            *_ 高级语言 50年代(Fortran/LISP/Cobol)
+            *_ 第一次软件危机60-70年代\n人月神话IBM 360系统 64年\nDijkstra68年提议取消goto
+            *_ 第二次软件危机 面向对象80年代
+        *[#lightblue] 架构目的
+            *_ 解决软件复杂度带来的问题
+        *[#lightblue] 复杂度的来源 高性能
+            *[#lightgreen] 单机复杂度 操作系统
+                *[#lightgrey] 进程
+                    *_ 管道/消息队列/信号量/共享存储等
+                *[#lightgrey] 线程
+                *[#lightgrey] 多任务并行
+                    *_ SMP 对称多处理器
+                    *_ NUMA 非一致存储访问
+                    *_ MPP 海量并行处理结构
+            *[#lightgreen] 集群复杂度
+                *[#lightgrey] 任务分配
+                *[#lightgrey] 任务分解
+        *[#lightblue] 复杂度的来源 高可用 冗余
+            *[#lightgreen] 计算高可用
+                *[#lightgrey] 任务分配器
+                    *_ 链接建立/检测/断链处理
+                    *_ 双机算法
+                        *_ 主备 冷备/温备/热备
+                        *_ 主主
+            *[#lightgreen] 存储高可用
+                *[#lightgrey] 备份数据
+                    *_ 备份可能导致不一致
+                    *_ 不一致导致复杂处理策略
+            *[#lightgreen] 状态决策
+                *[#lightgrey] 状态判断异常时采取行动
+                    *_ 独裁
+                    *_ 协商式
+                    *_ 民主式 脑裂
+        *[#lightblue] 复杂度的来源 可扩展
+            *[#lightgreen] 预测变化
+                *_ 不能都考虑/不能不考虑/考虑都可能不对
+                *_ 2年法则
+            *[#lightgreen] 应对变化
+                *[#lightgrey] 分层
+                    *_ 变化层/稳定层
+                    *_ 抽象层/实现层
+                *[#lightgrey] 1写2抄3重构
+        *[#lightblue] 复杂度的来源 低成本/安全/规模
+            *[#lightgreen] 低成本
+                *_ 与高性能/高可用冲突
+                *_ 通常不是首要目标/而是附加约束
+                *_ 通常需要创新
+                    *_ 引入新技术
+                        *_ NoSQL解决关系型DB应对高并发
+                        *_ 全文搜索引擎(ES/Solr/Sphinx)解决关系型DB like搜索低效
+                        *_ Hadoop解决传统文件系统无法应对海量数据
+                    *_ 开创全新技术领域
+                        *_ LinkedIn开发Kafka
+                        *_ Weibo在Redis/MySQL间加入SSD cache
+                        *_ Ruby换Java
+            *[#lightgreen] 安全
+                *[#lightgrey] 功能安全 防小偷
+                    *_ XSS/CSRF/SQL注入/Windows漏洞/密码破解
+                *[#lightgrey] 架构安全 防强盗
+                    *_ 防火墙 隔离网络 控制访问策略
+            *[#lightgreen] 规模
+                *[#lightgrey] 功能增加导致复杂度指数增长
+                *[#lightgrey] 数据增加导致复杂度增长
+                    *_ 关系型表太大 拆表 拆分规则+查询处理
+        *[#lightblue] 架构三原则
+            *[#lightgreen] 合适
+                *_ 将军难打无兵之仗
+                *_ 罗马不是一天建成的
+                *_ 冰面下面才是关键 没有卓越业务场景 却幻想灵光一闪成为天才 常常是失败的原因
+            *[#lightgreen] 简单
+            *[#lightgreen] 演进 演化优于一步到位
+        *[#lightblue] 架构案例
+            *[#lightgreen] 淘宝
+                *_ 个人网站时期,买个系统
+                *_ MySQL换Oracle+NAS
+                *_ java 1.0 php->java
+                    *_ php线程池死锁 请了sun的人 热切java 后面开发了支付宝
+                *_ java 2.0
+                    *_ 分库/放弃EJB/引入Spring/加入缓存/加CDN/使用开源JBoss
+                *_ java 2.0
+                    *_ 去IOE
+            *[#lightgreen] 手机QQ
+                *[#lightgrey] 十万级
+                    *_ 存储服务器 接入服务器
+                *[#lightgrey] 百万级
+                    *_ 存储集群 接入集群 状态同步服务器 长连接集群
+                *[#lightgrey] 千万级
+                    *_ 分IDC 同步集群
+                *[#lightgrey] 亿万级
+                    *_ 存储架构 通信架构
+        *[#lightblue] 架构设计流程 识别复杂度
+            *_ 高性能/高可用/可扩展的取舍/优先级排序
+            *[#lightgrey] 实例 微博使用消息队列
+                *_ 是否需要高性能
+                    *_ 端上数目->总量->峰值TPS(3倍)->留余量
+                *_ 是否需要高可用
+                    *_ 分析业务不可用的后果+概率
+                *_ 是否需要可扩展
+                    *_ 不需要
+        *[#lightblue] 架构设计流程 设计备选方案
+            *[#lightgrey] 常见错误
+                *_ 设计最优秀方案
+                *_ 只做一个方案
+                    *_ 3-5个方案 防止考虑不周/思虑太过
+                    *_ 方案差异明显
+                    *_ 不局限于熟悉的技术
+                *_ 备选方案过于详细 关注技术选型而非细节
+            *[#lightgrey] 实例 微博使用消息队列
+                *_ Kafka
+                *_ 集群+MySQL
+                *_ 集群+自研存储
+        *[#lightblue] 架构设计流程 评估选择备选方案
+            *[#lightgrey] 矩阵属性罗列
+                *_ 性能/可用性/硬件成本/项目投入/复杂度/安全/可扩展
+                *_ 数量对比法 相当于等权重
+                *_ 加权法
+                *_ 优先级法
+            *[#lightgrey] 实例 微博使用消息队列
+                *_ Kafka
+                    *_ 性能 高
+                    *_ 复杂度 低
+                    *_ 硬件成本 低
+                    *_ 可运维性 低 运维团队反馈没有经验
+                    *_ 可靠性  高
+                    *_ 人力投入 低
+                    *_ 性能 高
+                    *[#lightyellow] RocketMQ对比Kafka
+                        *_ 适用场景 Rocket适合业务 Kafka适合日志处理
+                        *_ 性能 Kafka单机TPS 百万 Rocket 10万
+                        *_ 实时性 均支持pull长轮询 Rocket实时性更好
+                        *_ 定时消息 Kafka不支持 Rocket支持
+                        *_ 可靠性  Rocket支持同/异步刷盘 同/异步Replication Kafka异步刷盘 异步Replication
+                        *_ 消息顺序 Kafka支持顺序，但是一台Broker宕机后会乱序 Rocket支持严格顺序，一台Broker宕机，发送会失败不会乱序
+                        *_ 失败重试 Rocket支持 Kafka不支持
+                        *_ 分布式事务消息 Rocket支持 Kafka不支持
+                        *_ 消息查询 Rocket支持 Kafka不支持
+                        *_ 消息回溯 Rocket支持时间精确到毫秒 Kafka支持offset
+                        *_ 支持队列 Rocket单机5w Kafka单机超过64队列/分区，发送性能会降低
+                *_ 集群+MySQL
+                    *_ 性能 中
+                    *_ 复杂度 中
+                    *_ 硬件成本 高
+                    *_ 可运维性 高
+                    *_ 可靠性 高
+                    *_ 人力投入 中
+                *_ 集群+自研存储
+                    *_ 性能 高
+                    *_ 复杂度 高
+                    *_ 硬件成本 低
+                    *_ 可运维性 高
+                    *_ 可靠性 低
+                    *_ 人力投入 高
+            *[#lightgrey] 实例 微博使用消息队列
+        *[#lightblue] 架构设计流程 详细方案设计
+            *[#lightgrey] Nginx负载均衡策略
+                *_ 轮询
+                *_ 加权轮询 适用于新老server性能不一致
+                *_ ip_hash 适用于session
+                *_ fair 根据server响应时间
+                *_ url_hash 适用于server能将url结果缓存
+            *_ 详细设计发现不可行要回溯
+                *_ 架构师要熟悉技术细节
+                *_ 分步骤/分阶段/分系统 降低方案复杂度
+            *[#lightgrey] 实例 微博使用消息队列
+                *[#lightyellow] 集群+MySQL
+                    *_ 数据表如何设计
+                    *_ 数据如何复制 MySQL主从
+                    *_ 主备服务器如何切换 ZooKeeper
+                    *_ 业务如何写入
+                    *_ 业务如何读取
+                    *_ 业务和Broker的通信协议 TCP ProtocolBuffer
+    *[#pink] 2高性能架构
+        *[#lightblue] 读写分离
+            *[#lightgrey] 复制延迟
+                *_ 写操作后的读操作在master 侵入code
+                *_ 读slave后失败读master 引发雪崩
+                *_ 关键业务全部读写master
+            *[#lightgrey] 分配机制
+                *[#lightyellow] 程序封装
+                    *_ 实现简单/每个语言一次/故障情况，如果发生主从切换，所有系统都需要修改配置&重启
+                    *_ 开源方案 淘宝TDDL Taobao Distributed Data Layer
+                *[#lightyellow] 中间件封装
+                    *_ 支持多语言
+                    *_ 中间件要完整支持SQL语法和协议，实现复杂，易出bug，需要长时间才能稳定
+                    *_ 所有操作经过 性能要求高
+                    *_ 主从切换不影响业务server
+                    *[#lightgreen] 开源方案
+                        *_ MySQL Proxy(Official但没有GA)
+                            *_ Atlas 奇虎360基于MySQL Proxy实现
+                        *_ MySQL Router(Official)
+        *[#lightblue] 分库分表
+            *[#lightgrey] 分库
+                *_ join问题
+                *_ 事务问题
+                *_ 成本问题
+            *[#lightgrey] 分表
+                *[#lightgreen] 垂直分表
+                    *_ 不常用,但占用大量空间的列拆分出去
+                    *_ 表操作数增加
+                *[#lightgreen] 水平分表
+                    *[#lightgrey] 路由
+                        *_ 范围
+                            * 优点 随数据增加平滑扩充新的表
+                            * 缺点 数据可能分布不均匀
+                        *_ Hash
+                            * 优点 数据分布均匀
+                            * 缺点 随数据增加扩充新的表麻烦 所有数据需要重新分布
+                        *_ 配置路由
+                            * 优点 设计简单 使用灵活
+                            * 缺点 需要多查询一次 路由表也可能是性能瓶颈
+                    *_ join 多次查询 再合并
+                    *_ count
+                        * 相加 简单 但性能低
+                        * 记录数 表
+                            *_ 性能好
+                            *_ 复杂度高
+                    *_ order by 只能多次查询 再汇总排序
+        *[#lightblue] NoSQL
+            *[#lightgreen] 关系型DB的问题
+                * 关系型存储行数据 无法支持复杂数据结构
+                * schema强约束 扩展不便
+                * 大数据场景IO较高 即使只对一列运算 整行数据进入内存
+                * 全文搜索功能弱 like整表扫描
+            *[#lightgreen] NoSQL的优势 牺牲ACID获得
+            *[#lightgreen] KV存储 复杂数据结构 Redis
+                * 事务仅支持I/C无法保证A/D
+            *[#lightgreen] 文档数据库 解决强schema约束 MongoDB
+                *_ 新增字段简单 历史数据不会出错 支持复杂数据结构
+                *_ 不支持事务
+                *_ 不支持join
+            *[#lightgreen] 列式数据库 大数据IO问题 HBase
+                *_ 节省IO 操作列不需要读整行数据
+                *_ 数据压缩比高 列数据相似度更高
+                *_ 频繁更新多个列时 可能有性能问题 因为多个列存储在磁盘不连续空间 随机写效率差
+                *_ 因为压缩率高 更新需要解压缩更新再压缩
+            *[#lightgreen] 全文搜索引擎 全文搜索能力 ElasticSearch
+                *_ 基本原理 inverted index 正排是文档到单词
+        *[#lightblue] 缓存架构
+            *_ 单机MemCache tps 5万以上
+            *[#lightgreen] 缓存穿透
+                *_ 数据不存在 放逻辑空值预防
+                *_ 缓存数据生成成本高
+                    *_ 识别爬虫禁止访问 可能影响SEO(搜索引擎优化)和推广
+                    *_ 监控识别 及时处理
+            *[#lightgreen] 缓存雪崩
+                *_ 更新锁 只有一个线程能更新缓存， 分布式情况可能需要分布式锁
+                *_ 后台更新 缓存预热
+            *[#lightgreen] 缓存热点
+                *_ 多缓存节点 过期时间范围内随机
+        *[#lightblue] 单服务器 PPC&TPC
+            *[#lightgreen] 性能关键 并发模型
+                *_ 如何处理连接
+                *_ 如何处理请求
+                *_ IO模型 阻塞与否/同步与否
+                *_ 进程模型 单进程/多进程/多线程
+            *[#lightgreen] PPC(Process Per Connection)
+                * 流程
+                    *_ 父进程 socket bind listen accept fork close
+                    *_ 子进程 read 业务处理 write close
+                * 问题
+                    *_ fork代价高
+                    *_ 进程通信复杂 IPC(Interprocess Communication)
+                    *_ 并发不高 最多几百
+                * pre-fork
+                    * 优点 省去fork操作
+                    * 缺点 惊群(Linux 2.6+解决)
+                    * Apache MPM pre-fork 支持256连接
+            *[#lightgreen] TPC(Thread Per Connection)
+                * 流程
+                    *_ 父进程 socket bind listen accept p-thread
+                    *_ 子线程 read 业务处理 write close
+                * 优点 解决 fork代价高/进程间通信复杂
+                * 缺点 创建线程也有代价/线程间共享&互斥复杂/多线程互相影响(单线程可能导致进程退出)
+                * pre-thread
+                    * Apache MPM worker 默认支持16*25=400并发线程
+        *[#lightblue] 单服务器 Reactor&Proactor
+                
+        *[#lightblue] 负载均衡 分类及架构
+        *[#lightblue] 算法
+    *[#pink] 3高可用架构
+left side
+    *[#pink] 4可扩展架构
+    *[#pink] 5架构实战
+    *[#pink] 6特别放送
+    *[#pink] 7结课测试
+@endmindmap
