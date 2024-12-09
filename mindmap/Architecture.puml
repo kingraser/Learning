@@ -297,8 +297,101 @@
         *[#lightblue] 单服务器 Reactor&Proactor
                 
         *[#lightblue] 负载均衡 分类及架构
-        *[#lightblue] 算法
+            *[#lightgreen] 负载均衡不只是为了业务单元的负载达到均衡状态/本质是业务分配器
+            *[#lightgreen] DNS负载均衡 地理级别
+                *_ 简单/成本低/就近访问 提升速度
+                *_ 更新不及时/扩展性差/分配策略简单
+            *[#lightgreen] 硬件负载均衡 F5/A10 集群级别
+                *_ 功能&性能强(百万级)/稳定性好/支持安全防护
+                *_ 价格高/扩展能力差
+            *[#lightgreen] 软件负载均衡 机器级别
+                *_ Nginx&LVS
+                    *_ Nginx软件7层
+                    *_ Linux内核4层
+                    *_ 协议和灵活性 Nginx支持http/Email协议 LVS协议无关,都可以做,例如聊天/数据库
+                *_ 简单/便宜/灵活
+                *_ 性能一般(Nginx5w,LVS10w级)/功能没有硬件强/一般不具备安全功能(防火墙和防DDos攻击等)
+        *[#lightblue] 负载均衡算法
+            *[#lightgreen] 任务平分类/负载均衡类/性能最优/Hash类
+            *[#lightgreen] 轮询 简单/不关心服务器状态
+            *[#lightgreen] 加权轮询 解决机器能力不一致
+            *[#lightgreen] 负载最低优先 感知机器状态/复杂
+            *[#lightgreen] 性能最优类
+                *_ 全部统计响应时间 本身也消耗性能
+                *_ 部分统计 确定合适采样率 本身复杂
+                *_ 统计周期如何确认 比较复杂
+            *[#lightgreen] 任务平分类/负载均衡类/性能最优/Hash类
+            *[#lightgreen] Hash类
+                *_ 源地址
+                *_ 业务ID
     *[#pink] 3高可用架构
+        *[#lightblue] CAP理论
+            *[#lightgreen] 分布式系统(inter-connected & share-data)在读写操作时,无法CAP三项全选
+            *[#lightgreen] C consistency 一致性 对指定客户端来说,读操作保证返回最新写操作结果
+            *[#lightgreen] A availability 可用性 非故障节点在合理时间返回合理响应
+            *[#lightgreen] P partition tolerance 分区容忍性 网络分区后系统可以继续function
+            *[#lightgreen] 逻辑上CA不可选 只能CP or AP
+        *[#lightblue] CAP细节
+            *[#lightgreen] CAP细节
+                *_ CAP关注的是data not system
+                *_ CAP是忽略网络延迟的
+                *_ 既要考虑分区时CP or AP, 更要考虑不分区时尽量CA
+                *_ 为分区恢复做准备
+            *[#lightgreen] ACID
+            *[#lightgreen] BASE
+                *_ Basically Available 损失部分 保证核心
+                *_ Soft State 即不一致
+                *_ Eventually Consistency
+        *[#lightblue] FMEA方法 排除可用性隐患
+            *[#lightgreen] 介绍
+                *_ Failure mode and effects analysis
+                *_ 给出初始架构设计图
+                *_ 假设某个部件出故障
+                *_ 分析影响
+                *_ 根据分析做优化
+            *[#lightgreen] 功能点 用户视角而非系统各个模块功能划分
+            *[#lightgreen] 故障模式 故障点/故障形式 只关注现象，暂不关注原因 多量化描述
+            *[#lightgreen] 故障影响 偶尔不可用/完全不可用/部分用户不可用/响应慢/结果出错 多量化描述
+            *[#lightgreen] 严重程度 致命/高/中/低/无 五档
+                *_ 严重程度 = 功能点重要程度*故障影响范围*功能点受损程度
+            *[#lightgreen] 原因
+                *_ 概率不同
+                *_ 检测手段不同
+                *_ 处理措施不同
+            *[#lightgreen] 概率 高/中/低
+                *_ 硬件
+                *_ 开源系统
+                *_ 自研系统
+            *[#lightgreen] 风险程度 严重程度*概率
+            *[#lightgreen] 已有措施 告警/容错/自恢复
+            *[#lightgreen] 规避措施 技术手段/管理手段
+            *[#lightgreen] 解决措施
+            *[#lightgreen] 后续规划
+            *[#lightgreen] FMEA实战
+        *[#lightblue] 高可用存储 双机架构
+            *_ 数据如何复制/节点职责/应对复制延迟/应对复制中断
+            *[#lightgreen] 主备复制
+                *_ 简单 只需复制数据 无需判断状态
+                *_ 备机仅备份,浪费资源 故障需要人工干预
+            *[#lightgreen] 主从复制
+                *_ 主机故障,不影响读 发挥了硬件性能
+                *_ 复杂 延迟可能导致不一致 故障需要人工干预
+            *[#lightgreen] 双机切换
+                *_ 主备状态判断
+                    *_ 状态传递渠道
+                    *_ 状态检测内容
+                *_ 切换决策 时机/策略/自动程度
+                *_ 数据冲突解决
+                *_ 互连式 自动决定主机 依赖状态传递渠道
+                *_ 中介式 状态决策更简单 中介高可用 MongoDB ReplicaSet
+                *_ 模拟式 实现简单 状态信息少,决策可能有偏差
+            *[#lightgreen] 主主复制 无需状态信息传递/状态决策/状态切换 但数据要双向复制 适用于临时性/可丢失/可覆盖
+        *[#lightblue] 高可用存储 集群和分区
+        *[#lightblue] 如何设计计算高可用
+        *[#lightblue] 业务高可用 异地多活
+        *[#lightblue] 异地多活 4大技巧
+        *[#lightblue] 异地多活设计4步走
+        *[#lightblue] 如何应对接口级故障
 left side
     *[#pink] 4可扩展架构
     *[#pink] 5架构实战
