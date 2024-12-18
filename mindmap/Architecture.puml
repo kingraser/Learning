@@ -295,7 +295,31 @@
                 * pre-thread
                     * Apache MPM worker 默认支持16*25=400并发线程
         *[#lightblue] 单服务器 Reactor&Proactor
-                
+            *[#lightgreen] Reactor(Dispatcher)
+                *_ PPC的问题 每个连接创建/销毁进程,开销大 解决方式:资源池
+                * 后续问题 阻塞IO效率低 可以改为非阻塞+轮询
+                    *_ CPU开销大
+                    *_ 连接数多的时候轮询效率低
+                * IO多路复用
+                    * 多连接共用一个阻塞对象后,进程只在一个阻塞对象等待,不再轮询所有连接
+                        *_ 常见实现方式 select/epoll/kqueue
+                    *_ 当某条连接有数据可以处理时,操作系统通知进程,进程从阻塞态返回,进行业务处理
+                * Reactor典型方案
+                    *[#lightyellow] 单reactor 单进程/线程
+                        * 特点
+                            *_ 优点 简单,无进程间通信,无进程竞争
+                            *_ 缺点 只有一个进程,无法发挥CPU多核性能
+                            *_ 缺点 Handler在处理某个连接上的业务时,无法处理其他连接的事件,很容易导致性能瓶颈
+                        * 适用场景 业务处理非常快速Redis/C语言一般是单进程/Java一般是单线程,因为JVM才是进程
+                    *[#lightyellow] 单reactor 多线程
+                        * 特点
+                            *_ 优点 可以充分利用多核处理能力
+                            * 缺点 多线程数据共享/访问复杂
+                                *_ 子线程处理后将结果返回主线程,涉及共享数据的互斥/保护机制
+                                *_ 以Java的NIO为例 Selector线程安全\n但Selector.selectKeys返回的集合非线程安全\n对selectedKeys必须单进程处理或采取同步措施保护
+                            *_ 缺点 Reactor承担所有event的监听/响应,只在主线程运行,瞬间高并发会成为性能瓶颈
+                    *[#lightyellow] 多reactor 多进程/线程
+            *[#lightgreen] Proactor
         *[#lightblue] 负载均衡 分类及架构
             *[#lightgreen] 负载均衡不只是为了业务单元的负载达到均衡状态/本质是业务分配器
             *[#lightgreen] DNS负载均衡 地理级别
