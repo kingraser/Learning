@@ -295,6 +295,12 @@
                 * pre-thread
                     * Apache MPM worker 默认支持16*25=400并发线程
         *[#lightblue] 单服务器 Reactor&Proactor
+            * IO说明
+                *_ IO两步1将数据读到内核空间2将数据读到用户空间
+                *_ 一般来说,1的耗时远大于2
+                *_ 1和2都阻塞是同步阻塞IO
+                *_ 1非阻塞2阻塞是同步非阻塞IO(Reactor)
+                *_ 1非阻塞2非阻塞是异步非阻塞IO(Proactor)
             *[#lightgreen] Reactor(Dispatcher)
                 *_ PPC的问题 每个连接创建/销毁进程,开销大 解决方式:资源池
                 * 后续问题 阻塞IO效率低 可以改为非阻塞+轮询
@@ -306,20 +312,51 @@
                     *_ 当某条连接有数据可以处理时,操作系统通知进程,进程从阻塞态返回,进行业务处理
                 * Reactor典型方案
                     *[#lightyellow] 单reactor 单进程/线程
+                        * 方案
+                            *_ Reactor对象通过select监控连接事件,收到事件后通过dispatch进行分发
+                            *_ 如果是连接建立的事件,则由Acceptor处理,Acceptor通过accept接受连接,并创建一个Handler来处理连接后续的各种事件
+                            *_ 如果不是连接建立事件,则Reactor会调用连接对应的Handler(第2步中创建的Handler)来进行响应
+                            *_ Handler会完成read->业务处理->send的完整业务流程
                         * 特点
                             *_ 优点 简单,无进程间通信,无进程竞争
                             *_ 缺点 只有一个进程,无法发挥CPU多核性能
                             *_ 缺点 Handler在处理某个连接上的业务时,无法处理其他连接的事件,很容易导致性能瓶颈
                         * 适用场景 业务处理非常快速Redis/C语言一般是单进程/Java一般是单线程,因为JVM才是进程
                     *[#lightyellow] 单reactor 多线程
+                        * 方案
+                            *_ 主线程中,Reactor对象通过select监控连接事件,收到事件后通过dispatch进行分发
+                            *_ 如果是连接建立的事件,则由Acceptor处理,Acceptor通过accept接受连接,并创建一个Handler来处理连接后续的各种事件
+                            *_ 如果不是连接建立事件,则Reactor会调用连接对应的Handler(第2步中创建的Handler)来进行响应
+                            *_ Handler只负责响应事件,不进行业务处理;Handler通过read读取到数据后,会发给Processor进行业务处理
+                            *_ Processor会在独立的子线程中完成真正的业务处理,然后将响应结果发给主进程的Handler处理;Handler收到响应后通过send将响应结果返回给client
                         * 特点
                             *_ 优点 可以充分利用多核处理能力
                             * 缺点 多线程数据共享/访问复杂
                                 *_ 子线程处理后将结果返回主线程,涉及共享数据的互斥/保护机制
                                 *_ 以Java的NIO为例 Selector线程安全\n但Selector.selectKeys返回的集合非线程安全\n对selectedKeys必须单进程处理或采取同步措施保护
                             *_ 缺点 Reactor承担所有event的监听/响应,只在主线程运行,瞬间高并发会成为性能瓶颈
+                            *_ 之所以没有单Reactor多进程,是因为进程间通信比线程更复杂
                     *[#lightyellow] 多reactor 多进程/线程
+                        * 方案
+                            *_ 父进程中mainReactor对象通过select监控连接建立事件,收到事件后通过Acceptor接收,将新的连接分配给某个子进程
+                            *_ 子进程的subReactor将mainReactor分配的连接加入连接队列进行监听,并创建一个Handler用于处理连接的各种事件。
+                            *_ 当有新的事件发生时，subReactor会调用连接对应的Handler(即第2步中创建的Handler)来进行响应
+                            *_ Handler完成read→业务处理→send的完整业务流程
+                        * 特点 相对单Reactor多线程更简单
+                            *_ 父进程和子进程的职责非常明确,父进程只负责接收新连接,子进程负责完成后续的业务处理
+                            *_ 父进程和子进程的交互很简单,父进程只需要把新连接传给子进程,子进程无须返回数据
+                            *_ 子进程之间是互相独立的,无须同步共享之类的处理(这里仅限于网络模型相关的select、read、send等无须同步共享,“业务处理”还是有可能需要同步共享的)
+                        * 开源实现
+                            *_ 多Reactor多进程 Nginx
+                            *_ 多Reactor多线程 MemCache/Netty
             *[#lightgreen] Proactor
+                *_ Reactor非阻塞同步网络模型:read/send都是同步,Proactor是异步网络模型
+                * 方案
+                    *_ ProactorInitiator负责创建Proactor和Handler,并将Proactor和Handler都通过AsynchronousOperationProcessor注册到内核
+                    *_ AsynchronousOperationProcessor负责处理注册请求,并完成I/O操作
+                    *_ AsynchronousOperationProcessor完成I/O操作后通知Proactor
+                    *_ Proactor根据不同的事件类型回调不同的Handler进行业务处理
+                    *_ Handler完成业务处理,Handler也可以注册新的Handler到内核进程
         *[#lightblue] 负载均衡 分类及架构
             *[#lightgreen] 负载均衡不只是为了业务单元的负载达到均衡状态/本质是业务分配器
             *[#lightgreen] DNS负载均衡 地理级别
@@ -978,12 +1015,12 @@ left side
                     *_ component
                     *_ code
     *[#pink] 6特别放送
-        *[#lightblue] Q&A
+        *[#lightblue] Q&A1
             *[#lightgreen] 提升技术
                 *_ 首先不能着急,循序渐进,持之以恒
                 *_ 知行合一
                 *_ 多交流
-        *[#lightblue] Q&A
+        *[#lightblue] Q&A2
             *[#lightgreen] 原版本架构设计原则
                 *_ 合适优于业内领先
                 *_ 演化优于过度设计
@@ -1110,6 +1147,24 @@ left side
                 *_ 算法设计与应用
                 *_ 算法设计与应用
         *[#lightblue] 单服务器高性能模式性能对比
+            *[#lightgreen] 对比模式
+                *_ iterative
+                *_ forking(PPC模式)
+                *_ preforked(prefork模式)
+                *_ threaded(TPC模式)
+                *_ preThreaded(pre-thread模式)
+                *_ poll
+                *_ epoll(Reactor模式)
+            *[#lightgreen] 横向看对比
+                *_ 并发2k内 prefork/pre-thread/epoll性能接近
+                *_ 并发8k以上 只有pre-thread/epoll能继续运行,但性能下降,epoll下降更平缓
+                *_ pre-thread的性能大概是forking的4倍,说明进程的消耗大概是线程的4倍
+            *[#lightgreen] 纵向看转折
+                *_ 并发11k时 pre-thread性能从2200下降到970,推测线程切换消耗超过了IO处理
+                *_ poll模式随着并发数增多稳定下降,因为需要遍历的描述符越多,其性能越低(select模式类似)
+                *_ 并发超过10k时,epoll性能稳定下降
+                *_ 所以Nginx为了支持10K+并发,多进程Reactor模式
+                *_ Redis单进程Reactor模式,是因为内部访问,并发一般不会超过10k
         *[#lightblue] 扒一扒中台皇帝的外衣
             *_ 中台的价值 提炼业务共性需求,减少重复造轮子
             *[#lightgreen] 实际痛点
