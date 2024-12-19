@@ -1,0 +1,75 @@
+@startmindmap
+*[#orange] JVM
+    *[#pink] 1基本原理
+        *[#lightblue] 代码如何运行
+            *[#lightgreen] 为何需要JVM
+                *_ 提升移植性
+                * 提供托管环境
+                    *_ 内存管理/垃圾回收
+                    *_ 数组越界/动态类型/安全权限等动态检测
+            *[#lightgreen] JVM如何运行字节码
+                * JVM运行时内存区域
+                    *[#lightyellow] 线程共享
+                        *_ 方法区,(class文件先加载至此)
+                        *_ 堆
+                    *[#lightyellow] 线程私有
+                        *_ PC寄存器(存放各个线程执行位置)
+                        *_ Java方法栈
+                        *_ 本地方法(用C++写的native方法)栈
+                * 运行细节
+                    *_ 源码编译为opCode(大小为一字节,所以又称字节码),字节码被JVM转换为机器码
+                    *_ 每调用一个方法,方法栈中生成一个栈帧(存放局部变量以及字节码的操作数,大小是提前计算好,不要求栈帧在内存空间里连续分布)
+                    *_ 退出方法,弹出栈帧,并舍弃
+                    * 字节码转为机器码的两种方式
+                        *_ 解释执行 无需等待编译
+                        *_ JIT(JustInTime compilation)即时编译 运行更快(速度可能超过C++)
+                    * 实际是混合运行:默认解释,热点JIT
+                    * JIT编译器 C1(client,编译时间短)/C2(server,编译时间长但更快)/Graal
+                    * 热点先C1再C2
+        *[#lightblue] 基本类型
+            *_ boolean 1字节
+            *_ byte 1字节
+            *_ short 2字节
+            *_ char 2字节
+            *_ int 4个字节
+            *_ long 8个字节
+            *_ float 4个字节 有+0.0和-0.0,且相等,有范围是NaN(Not a Number)
+            *_ double 8个字节 同上
+            *_ 栈帧上除了long和double,实际都是和int一样,4个字节
+        *[#lightblue] 如何加载Java类
+            *[#lightgreen] 加载 类加载器加载类(字节流,可以是class文件,也可是网络获取) Parent委派
+            *[#lightgreen] 链接
+                *_ 验证
+                * 准备
+                    *_ 静态字段分配内存/初始化
+                    *_ 类层次相关数据结构:例如实现虚方法的动态绑定的方法表
+                * 解析
+                    *_ 符号引用转为实际引用(可能触发其他类加载)
+                    *_ 静态字段分配内存/初始化
+            *[#lightgreen] 初始化
+                *_ 静态方法
+                *_ 常量标记+赋值
+        *[#lightblue] 如何执行方法调用上
+            *[#lightgreen] 重载(静态绑定)
+                *_ 不考虑对基本类型自动装拆箱以及可变长参数选取
+                *_ 允许自动装拆箱,但不允许可变长参数选取
+                *_ 允许自动装拆箱以及可变长参数选取
+                *_ 多个方法匹配,选取最贴切的,重点考虑参数类型的继承关系
+            *[#lightgreen] 重写(动态绑定)
+                * 子类和父类有名字+参数列表均相同的方法
+                    *_ 静态情况下,子类隐藏了父类方法
+                    *_ 非静态&&非私有,子类重写了父类方法
+        *[#lightblue] 如何执行方法调用下
+        *[#lightblue] 如何处理异常
+        *[#lightblue] 如何实现反射
+        *[#lightblue] 如何实现invokeDynamic上
+        *[#lightblue] 如何实现invokeDynamic下
+        *[#lightblue] 对象的内存布局
+        *[#lightblue] 垃圾回收上
+        *[#lightblue] 垃圾回收下
+left side
+    *[#pink] 2高效编译
+    *[#pink] 3代码优化
+right side
+    *[#pink] 4黑科技
+@endmindmap
