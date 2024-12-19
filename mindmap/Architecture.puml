@@ -171,7 +171,6 @@
                     *_ 可运维性 高
                     *_ 可靠性 低
                     *_ 人力投入 高
-            *[#lightgrey] 实例 微博使用消息队列
         *[#lightblue] 架构设计流程 详细方案设计
             *[#lightgrey] Nginx负载均衡策略
                 *_ 轮询
@@ -179,7 +178,7 @@
                 *_ ip_hash 适用于session
                 *_ fair 根据server响应时间
                 *_ url_hash 适用于server能将url结果缓存
-            *_ 详细设计发现不可行要回溯
+            * 详细设计发现不可行要回溯
                 *_ 架构师要熟悉技术细节
                 *_ 分步骤/分阶段/分系统 降低方案复杂度
             *[#lightgrey] 实例 微博使用消息队列
@@ -260,7 +259,7 @@
             *_ 单机MemCache tps 5万以上
             *[#lightgreen] 缓存穿透
                 *_ 数据不存在 放逻辑空值预防
-                *_ 缓存数据生成成本高
+                * 缓存数据生成成本高
                     *_ 识别爬虫禁止访问 可能影响SEO(搜索引擎优化)和推广
                     *_ 监控识别 及时处理
             *[#lightgreen] 缓存雪崩
@@ -358,7 +357,7 @@
                     *_ Proactor根据不同的事件类型回调不同的Handler进行业务处理
                     *_ Handler完成业务处理,Handler也可以注册新的Handler到内核进程
         *[#lightblue] 负载均衡 分类及架构
-            *[#lightgreen] 负载均衡不只是为了业务单元的负载达到均衡状态/本质是业务分配器
+            *_ 负载均衡不只是为了业务单元的负载达到均衡状态/本质是业务分配器
             *[#lightgreen] DNS负载均衡 地理级别
                 *_ 简单/成本低/就近访问 提升速度
                 *_ 更新不及时/扩展性差/分配策略简单
@@ -373,32 +372,32 @@
                 *_ 简单/便宜/灵活
                 *_ 性能一般(Nginx5w,LVS10w级)/功能没有硬件强/一般不具备安全功能(防火墙和防DDos攻击等)
         *[#lightblue] 负载均衡算法
-            *[#lightgreen] 任务平分类/负载均衡类/性能最优/Hash类
-            *[#lightgreen] 轮询 简单/不关心服务器状态
-            *[#lightgreen] 加权轮询 解决机器能力不一致
-            *[#lightgreen] 负载最低优先 感知机器状态/复杂
+            *_ 任务平分类/负载均衡类/性能最优/Hash类
+            *_ 轮询 简单/不关心服务器状态
+            *_ 加权轮询 解决机器能力不一致
+            *_ 负载最低优先 感知机器状态/复杂
             *[#lightgreen] 性能最优类
                 *_ 全部统计响应时间 本身也消耗性能
                 *_ 部分统计 确定合适采样率 本身复杂
                 *_ 统计周期如何确认 比较复杂
-            *[#lightgreen] 任务平分类/负载均衡类/性能最优/Hash类
+            *_ 任务平分类/负载均衡类/性能最优/Hash类
             *[#lightgreen] Hash类
                 *_ 源地址
                 *_ 业务ID
     *[#pink] 3高可用架构
         *[#lightblue] CAP理论
-            *[#lightgreen] 分布式系统(inter-connected & share-data)在读写操作时,无法CAP三项全选
-            *[#lightgreen] C consistency 一致性 对指定客户端来说,读操作保证返回最新写操作结果
-            *[#lightgreen] A availability 可用性 非故障节点在合理时间返回合理响应
-            *[#lightgreen] P partition tolerance 分区容忍性 网络分区后系统可以继续function
-            *[#lightgreen] 逻辑上CA不可选 只能CP or AP
+            *_ 分布式系统(inter-connected & share-data)在读写操作时,无法CAP三项全选
+            *_ C consistency 一致性 对指定客户端来说,读操作保证返回最新写操作结果
+            *_ A availability 可用性 非故障节点在合理时间返回合理响应
+            *_ P partition tolerance 分区容忍性 网络分区后系统可以继续function
+            *_ 逻辑上CA不可选 只能CP or AP
         *[#lightblue] CAP细节
             *[#lightgreen] CAP细节
                 *_ CAP关注的是data not system
                 *_ CAP是忽略网络延迟的
                 *_ 既要考虑分区时CP or AP, 更要考虑不分区时尽量CA
                 *_ 为分区恢复做准备
-            *[#lightgreen] ACID
+            *_ ACID
             *[#lightgreen] BASE
                 *_ Basically Available 损失部分 保证核心
                 *_ Soft State 即不一致
@@ -446,7 +445,7 @@
                 *_ 互连式 自动决定主机 依赖状态传递渠道
                 *_ 中介式 状态决策更简单 中介高可用 MongoDB ReplicaSet
                 *_ 模拟式 实现简单 状态信息少,决策可能有偏差
-            *[#lightgreen] 主主复制 无需状态信息传递/状态决策/状态切换 但数据要双向复制 适用于临时性/可丢失/可覆盖
+            *_ 主主复制 无需状态信息传递/状态决策/状态切换 但数据要双向复制 适用于临时性/可丢失/可覆盖
         *[#lightblue] 高可用存储 集群和分区
             *[#lightgreen] 数据集群
                 *[#lightgrey] 数据集中
@@ -828,7 +827,7 @@ left side
                         *_ 连接保活
                         *_ 消息管理
                         *_ 推送规则维护
-                * 存储云/图片云 数据量大/体积小/访问有时效性
+                *_ 存储云/图片云 数据量大/体积小/访问有时效性
             *[#lightgreen] 业务层
                 *_ 业务拆分
                 *_ 分久必合 职责关联性强的合并为虚拟业务域
@@ -1066,7 +1065,7 @@ left side
                         *_ Disruptor使用volatile和CAS做无锁设计
                         *_ Netty的Zero-Copy
                     *_ 写个Demo,调试查看调用栈
-                * 时间分配 时间不够的话,不用test/review code
+                *_ 时间分配 时间不够的话,不用test/review code
         *[#lightblue] 架构师成长之路
             *[#lightgreen] 架构师内功
                 *_ 判断力 判断系统复杂度在哪里
