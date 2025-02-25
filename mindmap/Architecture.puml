@@ -1192,4 +1192,39 @@ left side
         *_ 坚持梦想
         *_ 坚持学习
         *_ 坚持输出
+    *[#pink] 9旅程再启
+        *[#lightblue] 接口类设计技巧
+            *[#lightgreen] 微服务特点
+                *_ 服务分布式
+                *_ 数据分布式
+            *[#lightgreen] BFF(Backed For Frontend)
+                *[#lightgrey] 应用场景
+                    *_ 接口聚合
+                    *_ 多端适配
+                    *_ 接口兼容
+                *[#lightgrey] 落地经验
+                    * 前端负责开发
+                        * 好处
+                            *_ 最清楚前端需求
+                            *_ Node.js统一技术栈
+                        * 坏处
+                            *_ 前端干后端,可能不擅长
+                            *_ BFF与后端技术栈不同,DevOps有额外工作量
+                    * 后端负责开发 优缺点和前端开发相反
+                *[#lightgrey] 什么场景适用
+                    *_ 访问量大,复杂.比如一/二级页面(首页/导航)
+            *[#lightgreen] GraphQL API查询语言规范 Facebook2015开源
+                *_ 客户端指定需要数据,减少数据传输
+                *_ 可以从多个数据源获取数据
+                *_ GraphQL是API接口规范,BFF是API接口架构
+            *[#lightgreen] 接口循环调用如何应对
+                * 梳理调用链(复杂,实践效率低,定位时间长)
+                * 请求唯一标识(影响性能,需要保存一段时间内大请求ID和状态)
+        *[#lightblue] 分布式事务
+        *[#lightblue] 全局幂等
+        *[#lightblue] 异地多活成熟架构模式
+        *[#lightblue] 云原生时代架构师进化之道
+        *[#lightblue] 大模型时代架构师进化之道
+        *[#lightblue] 架构演进的技巧和原则
+        *[#lightblue] 架构师面试和晋升
 @endmindmap
