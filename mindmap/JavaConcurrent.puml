@@ -1,0 +1,165 @@
+@startmindmap
+* Java Concurrent Programming
+    *[#orange] 开篇
+        *[#lightgreen] 三大核心问题
+            *_ 分工 分解任务&分配给线程
+            *_ 同步 线程间如何协作 条件不满足则等待,条件满足则唤醒
+            *_ 互斥 保证同一时间只有一个线程能访问特定资源
+        *[#lightgreen] 学习方法
+            *_ 跳出来看全景
+            *_ 转进去看本质
+    *[#orange] 并发理论基础
+        *[#lightgreen] bug源头
+            *_ 可见性 缓存导致
+            *_ 原子性 线程切换导致(cpu指令级别)
+            *_ 有序性 编译优化导致
+        *[#lightgreen] Java内存模型
+            *_ 提供禁用缓存和编译优化的方法
+            *_ 关键字:volatile/synchronized/final
+            * happens-before六原则
+                *_ 同一线程中的顺序性,前面操作结果对后面可见
+                *_ volatile的写操作对后续读操作可见
+                *_ 传递性 A before B & B before C => A before C
+                *_ Monitor中lock的解锁对后续加锁可见
+                *_ 线程start规则 线程A中start线程B,B能看见A在startB之前的操作结果
+                *_ 线程join规则 线程A中等待子线程B完成(join),A能看到B的操作结果
+        *[#lightgreen] 互斥锁
+            *_ 一定要明确lock和受保护资源的对应关系
+            * 涉及多个资源的业务,需要覆盖所有涉及的资源
+                *_ 细粒度锁
+                *_ 原子性的本质是中间状态对外不可见
+        *[#lightgreen] 死锁
+            *_ 互斥/占有且等待期间不释放/不可抢占/循环等待
+            *_ 破解占有且等待期间不释放:一次申请所有资源
+            *_ 不可抢占:主动释放资源(synchronized关键字做不到)
+            *_ 循环等待:按照顺序申请
+        *[#lightgreen] 通知/等待
+            *_ 破解占有且等待期间不释放:一次申请所有资源时,尝试
+            *_ 使用死循环消耗大
+            *_ 使用synchronized配合wait/notify/notifyAll
+            *_ 尽量使用notifyAll,因为notify可能导致某些线程不会被通知
+        *[#lightgreen] 安全性/活跃性/性能问题
+            *[#lightblue] 安全性
+                *_ 即一致性
+                *_ 访问共享资源加锁
+            *[#lightblue] 活跃性
+                *_ 活锁:加入随机时间解决(Raft协议)
+                *_ 饥饿:资源丰富/公平/占用时间不要太长;实操一般是公平,因为资源丰富和占用时间是业务决定的
+            *[#lightblue] 性能问题
+                *_ 无锁:如TLS(Tread Local Storage)/Copy on write
+                *_ 减少锁占用时间,使用细粒度锁(ConcurrentHashMap)
+                *_ 指标:吞吐量/延迟/并发量
+        *[#lightgreen] Monitor
+            *_ Hasen模型:notify放在最后
+            *_ Hoare模型:A通知B后,A阻塞,待B完成后再唤醒A
+            * MESA模型:A通知B后,A继续执行,B继续尝试获取锁
+                *_ while(条件不满足) wait();
+            *[#lightblue] notify何时使用
+                *_ 线程等待条件相同
+                *_ 线程唤醒后操作一致
+                *_ 只需要唤醒一个
+        *[#lightgreen] Java线程生命周期
+            *_ New
+            *_ Runnable 调用start()
+            *_ Blocked 等待synchronized锁
+            * Waiting/Timed-waiting
+                *_ 调用Object.wait()/Thread.join()/LockSupport.park()
+                *_ timed只是多了超时参数
+            * Terminated
+                *_ 运行完成自动
+                *_ 调用stop()不会主动释放锁
+                * 调用interrupt()通知相关线程
+                    *_ 异常
+                    *_ isInterrupted()检查是否被中断
+            *_ 用jstack命令/Java VisualVM可以查看线程栈信息
+        *[#lightgreen] 创建多少线程合适
+            *_ 核心:尽量提高硬件利用率
+            *_ CPU密集型任务:CPU核数+1
+            *_ IO密集型任务:CPU核数*[1+(IO耗时/CPU耗时)]
+            *_ IO密集型任务:IO耗时/CPU耗时未知,一般通过压测
+        *[#lightgreen] 为什么局部变量线程安全
+            *_ 每个线程有独立的调用栈
+            *_ 局部变量在栈帧里
+        *[#lightgreen] 运用面向对象思想写好并发程序
+            *_ 封装共享变量
+            *_ 识别共享变量的约束条件
+            *_ 制定并发访问策略:避免共享/不变模式/Monitor等同步工具
+            *_ 使用成熟工具类/避免使用低级同步原语如synchronized/避免过早优化
+            *_ 避免共享变量逸出
+        *[#lightgreen] 答疑
+            *_ 锁应该私有/不可变/不可重用
+            *_ String/Integer不适合做锁,因为可以重用
+            *_ 竞态条件需要格外关注
+            *_ 方法调用先计算参数
+            *_ interrupted exception抛出时,状态会清除;所以catch操作最好重新设置中断标志
+    *[#orange] 并发工具类
+        *[#lightgreen] Lock&Condition
+            * lock对比synchronized
+                *_ 能响应中断lockInterruptibly()
+                *_ 支持超时tryLock(long time, TimeUnit timeunit)
+                *_ 支持非阻塞的获得锁tryLock()
+            *_ 可重入锁:线程可以重复获取同一把锁
+            *_ 公平锁:等待时间长的线程先获得锁,用构造函数的参数指定
+            * 用锁实践
+                *_ 永远只在更新对象的成员变量时加锁
+                *_ 永远只在访问可变的成员变量时加锁
+                *_ 永远不在调用其他对象的方法时加锁(调用其他对象可能有不可预知的行为,比如耗时很大;如果其他对象也有加锁,可能导致死锁)
+        *[#lightgreen] Semaphore
+            *_ 一个计数器/一个等待队列/三个方法init&increment/decrement
+            *_ 允许多个线程同时访问临界区;常见应用场景:池化资源限流器
+        *[#lightgreen] ReadWriteLock
+            *_ 允许多个线程同时读/只许一个线程写/写时禁止读
+            *_ 不允许锁升级(读锁获取后再加写锁),会导致所有线程阻塞
+            *_ 允许锁降级
+            *_ 写锁支持条件变量,读锁不支持
+        *[#lightgreen] StampedLock
+            *_ 类似读写锁,加锁时返回stamp,解锁时输入
+            *_ 支持乐观读(无锁),所以性能好
+            *_ 不支持重入/读写锁都不支持条件变量
+            *_ 支持锁升级/降级
+            *_ 不要调用中断操作,如需中断,需要使用支持中断的方法
+        *[#lightgreen] CountDownLatch/CyclicBarrier
+            *_ CyclicBarrier支持回调函数/自动重置,可以多轮使用
+            *_ CyclicBarrier执行回调函数的线程是将数值减为0的线程
+            *_ CountDownLatch解决一个线程等待多个线程结束的场景
+        *[#lightgreen] 并发容器
+            *_ 注意事项:组合操作注意竞态条件/使用迭代器
+            *_ List copyOnWrite,适合读多写少的场景/而且能够容忍读写短暂不一致
+            *_ Set
+            *_ Map key/value都不能为null
+            *_ Queue 使用无界队列时注意OOM
+        *[#lightgreen] 原子类
+            *_ ABA问题
+            *_ CAS(Compare&Swap)cpu指令级别,可以保证原子性
+        *[#lightgreen] Executor和线程池
+            *_ 生产/消费者模式
+            *_ 使用有界队列和指定拒绝策略
+        *[#lightgreen] Future/CompletableFuture
+            *_ 适合多线程互相有依赖的情况
+            *_ CompletableFuture实现了CompletionStage接口,支持任务编排
+            *_ 支持串行;并行;And/Or汇聚;异常处理
+        *[#lightgreen] Future/CompletableFuture
+            *_ 适合多线程互相有依赖的情况
+            *_ CompletableFuture实现了CompletionStage接口,支持任务编排
+            *_ 支持串行;并行;And/Or汇聚;异常处理
+        *[#lightgreen] CompletionService
+            *_ 利用阻塞队列批量执行异步任务
+            *_ CompletableFuture实现了CompletionStage接口,支持任务编排
+            *_ 支持串行;并行;And/Or汇聚;异常处理
+        *[#lightgreen] Fork/Join
+            *_ 支持任务窃取机制
+            *_ 线程池线程数默认CPU核数
+            *_ 适合分治计算,如统计大文件的词频
+left side
+    *[#orange] 并发设计模式
+        *[#lightgreen] Immutability
+            *_ flyweight pattern(享元模式)所以Integer/String不适合做锁
+        *[#lightgreen] Copy-on-Write
+            *_ 可以写的时候再复制
+        *[#lightgreen] 避免共享
+            *_ ThreadLocal注意内存泄漏
+        *[#lightgreen] Guarded Suspension
+        *[#lightgreen] Balking
+    *[#orange] 案例分析
+    *[#orange] 其他并发模型
+@endmindmap
