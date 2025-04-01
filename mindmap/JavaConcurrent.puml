@@ -155,11 +155,32 @@ left side
         *[#lightgreen] Immutability
             *_ flyweight pattern(享元模式)所以Integer/String不适合做锁
         *[#lightgreen] Copy-on-Write
-            *_ 可以写的时候再复制
+            *_ 可以写的时候再复制;读多写少场景适合,注意性能
         *[#lightgreen] 避免共享
             *_ ThreadLocal注意内存泄漏
+            *_ Spring使用ThreadLocal管理事务,所以事务信息不能跨线程共享
         *[#lightgreen] Guarded Suspension
+            *_ 等待唤醒机制
         *[#lightgreen] Balking
+            *_ 直译畏惧不前,犹豫;实际就是别的线程做了,本线程就不做了;用在单例模式中
+        *[#lightgreen] Thread per Message
+            *_ 分工模式:为每个任务派发一个线程;缺点是线程较重,可以使用协程;容易OOM,可以考虑限流
+        *[#lightgreen] Worker Thread
+            *_ 线程池:注意事项:有界队列/拒绝策略/避免死锁(池内任务必须相互独立,无依赖关系)
+        *[#lightgreen] 两阶段终止
+            *_ 线程:调用中断方法将阻塞/等待线程回到runnable
+            *_ 线程:检查终止标志位(可以是系统中断标志,也可自定义,推荐自定义)
+            *_ 线程池shutdown/shutdownNow
+        *[#lightgreen] 生产者/消费者模式
+            *_ 解耦/平衡速度差异/支持批量提升性能
+            *_ 使用毒丸对象终止
+        *[#lightgreen] Worker Thread
     *[#orange] 案例分析
+        *[#lightgreen] Guava限流
+            *_ 令牌桶:定时放令牌,拿到令牌再执行/漏桶:指定速度漏水(执行任务)
+            *_ 计算令牌生成的时间
+        *[#lightgreen] Netty
+        *[#lightgreen] Disruptor
+        *[#lightgreen] HiKariCP
     *[#orange] 其他并发模型
 @endmindmap
