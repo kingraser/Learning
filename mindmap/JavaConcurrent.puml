@@ -34,8 +34,7 @@
             *_ 不可抢占:主动释放资源(synchronized关键字做不到)
             *_ 循环等待:按照顺序申请
         *[#lightgreen] 通知/等待
-            *_ 破解占有且等待期间不释放:一次申请所有资源时,尝试
-            *_ 使用死循环消耗大
+            *_ 破解占有且等待期间不释放:一次申请所有资源时,尝试使用死循环消耗大
             *_ 使用synchronized配合wait/notify/notifyAll
             *_ 尽量使用notifyAll,因为notify可能导致某些线程不会被通知
         *[#lightgreen] 安全性/活跃性/性能问题
@@ -92,6 +91,7 @@
             *_ 竞态条件需要格外关注
             *_ 方法调用先计算参数
             *_ interrupted exception抛出时,状态会清除;所以catch操作最好重新设置中断标志
+left side
     *[#orange] 并发工具类
         *[#lightgreen] Lock&Condition
             * lock对比synchronized
@@ -150,7 +150,6 @@
             *_ 支持任务窃取机制
             *_ 线程池线程数默认CPU核数
             *_ 适合分治计算,如统计大文件的词频
-left side
     *[#orange] 并发设计模式
         *[#lightgreen] Immutability
             *_ flyweight pattern(享元模式)所以Integer/String不适合做锁
@@ -174,13 +173,36 @@ left side
         *[#lightgreen] 生产者/消费者模式
             *_ 解耦/平衡速度差异/支持批量提升性能
             *_ 使用毒丸对象终止
-        *[#lightgreen] Worker Thread
     *[#orange] 案例分析
         *[#lightgreen] Guava限流
             *_ 令牌桶:定时放令牌,拿到令牌再执行/漏桶:指定速度漏水(执行任务)
             *_ 计算令牌生成的时间
         *[#lightgreen] Netty
+            *_ 一个链接对应一个线程
+            *_ 两个EventLoopGroup:一个负责socket读写,一个负责逻辑读写
         *[#lightgreen] Disruptor
+            *_ 高性能有界队列
+            *_ 内存分配更加合理,使用RingBuffer数据结构,数组元素在初始化时一次性全部创建,提升缓存命中率;对象循环利用,避免频繁GC
+            *_ 能够避免伪共享,提升缓存利用率
+            *_ 采用无锁算法,避免频繁加锁&解锁的性能消耗:如果没有足够的空余位置,就出让CPU使用权,然后重新计算;反之则用CAS设置入队索引
         *[#lightgreen] HiKariCP
+            *_ FastList remove改成逆序查找/get(int index)不做越界检查
+            *_ ConcurrentBag 通过ThreadLocal做一次预分配,避免直接竞争共享资源
     *[#orange] 其他并发模型
+        *[#lightgreen] Actor
+            *[#lightblue] 能力
+                *_ 处理消息
+                *_ 存储内部状态
+                *_ 与其他Actor通信
+            *[#lightblue] 动作
+                *_ 创建Actor
+                *_ 发送消息给其他Actor
+                *_ 确定如何处理下一条消息(状态机状态变化)
+            *_ 与方法调用不通:调用方法同步,Actor通信异步;调用需要对象引用在同一线程,Actor可以不在一台机器上
+        *[#lightgreen] 内存事务
+            *_ MVCC(Multi-Version Concurrency Control)
+        *[#lightgreen] 协程
+            *_ Java21开始支持
+        *[#lightgreen] CSP(Communicating Sequential Processes)模型
+            *_ 类似Actor,差异:Actor发送消息非阻塞,Go channel阻塞;Actor不保证消息送达,Go channel保证,但有可能死锁
 @endmindmap
