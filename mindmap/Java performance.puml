@@ -84,7 +84,96 @@
                 *_ 智能横向扩容
                 *_ 提前扩容
     *[#pink] 多线程性能调优
+        *[#lightblue] synchronized优化
+            *_ 字节码monitorenter/monitorexit来持有/释放monitor对象
+            *_ monitor可以和对象一起创建/销毁,由c++ObjectMonitor实现
+            *_ monitor由操作系统mutex lock实现互斥,会导致内核态/用户态切换,cost高
+            *_ 对象实例在内存中的三部分:对象头/实例数据/对齐填充
+            *_ 对象头由mark word/指向类的指针/数组长度三部分组成
+            *[#lightgreen] mark word64bit
+                *_ 无锁 56bit hashCode+1bit unused+4bit 分代年龄+1bit 是否偏向锁(0)+2bit锁标识位(01)
+                *_ 偏向锁 54bit 线程ID+2bit Epoch+1bit unused+4bit 分代年龄+1bit 是否偏向锁(1)+2bit锁标识位(01)
+                *_ 轻量级锁 62bit指向轻量级锁的指针+2bit锁标识位(00)
+                *_ 重量级锁 62bit指向重量级锁的指针+2bit锁标识位(10)
+                *_ GC标记 62bit空+2bit锁标识位(11)
+            *_ 偏向锁优化同一线程多次申请同一个锁的竞争
+            *_ 大量线程竞争同一资源会导致偏向锁频繁被撤销,可以通过调整JVM参数禁用偏向锁或使用重量级锁
+            *_ 偏向锁竞争先用CAS获取锁,若失败升级为轻量级锁
+            *_ 轻量级锁适合不存在长时间竞争的场景,可以调整JVM参数调整是否关闭自旋
+            *_ 自旋尝试多次仍无法获取锁,升级到重量级锁,未抢到锁的线程会阻塞进入wait_set
+            *_ 动态编译实现锁粗化/锁消除
+            *_ 编码可以细化锁粒度
+        *[#lightblue] Lock优化
+            *_ 读写锁实现读写分离
+            *_ StampedLock使用异或,不使用CAS,性能更好;但不支持重入,不支持条件变量,线程中断时可能导致CPU暴涨
+        *[#lightblue] CAS
+            *_ CPU通过总线锁定和缓存锁定保证原子性
+            *_ 失败for循环,有CPU开销
+        *[#lightblue] 上下文切换
+            *_ vmstat/pidstat查看上下文切换
+            *[#lightgreen] 减少上下文切换
+                *_ 减少锁持有时间/降低锁粒度(锁分离/锁分段)/根据场景选择非阻塞乐观锁
+                *_ 减少GC
+                *_ 使用协程
+                *_ 合理设置线程大小
+                *_ 确认安全的情况使用notify而非notifyAll
+        *[#lightblue] 并发容器
+            *_ 用ConcurrentSkipListMap处理大数据(千万级)
+        *[#lightblue] 线程池大小
+            *_ cpu密集型 CPU核数+1
+            *_ IO密集型 CPU核数*(线程等待时间/线程运行时间+1);可以用VisualVM查看比例
+            *_ 优化串行才是性能关键,并行优化有Amdahl定律:S=1/[(1-p)+p/N];S是加速比,p是可并行化的比例,N是并行资源数(例如CPU核数)
+        *[#lightblue] 协程
+            *_ N:1线程模型的缺点在于操作系统不能感知用户态的线程,因此容易造成某一个线程进行系统调用内核线程时被阻塞,从而导致整个进程被阻塞
+            *_ go是N:M
+            *_ Java21协程
+            *_ 适合IO密集型
+        *[#lightblue] 强弱一致性
+            *_ Happens-Before原则
     *[#pink] 设计模式调优
+        *[#lightblue] 单例
+            *_ 保证全局一个实例&只有一个全局访问点
+            *[#lightgreen] 饿汉模式
+                *_ 类初始化时创建实例
+                *_ 优点:多线程下唯一;性能好
+                *_ 缺点:占用内存
+            *[#lightgreen] 懒汉模式
+                * 实现方式
+                    *_ 懒加载
+                    *_ 同步锁
+                    *_ 双重检查(加volatile)
+                    *_ 内部类实现
+        *[#lightblue] 原型(prototype)和享元(flyweight)模式
+            *[#lightgreen] prototype模式
+                *_ 实现cloneable接口;重写Object.clone()方法;重写中调用super.clone()
+                *_ 深copy和浅copy
+                *_ 适用重复创建对象场景,例如spring的bean管理
+            *[#lightgreen] flyweight模式
+                *_ Java的String和Integer
+                *_ 线程池
+        *[#lightblue] 设计模式优化并发
+            *[#lightgreen] 线程上下文模式
+                *_ Spring ApplicationContext
+                *_ ThreadLocal
+                *_ 传递或者隔离变量
+            *[#lightgreen] Thread-per-message模式
+                *_ 解决IO耗时的问题
+                *_ 线程池
+            *[#lightgreen] worker-thread模式
+                *_ 减少线程的创建/销毁开销
+        *[#lightblue] 生产者/消费者模式
+            * 常见实现
+                *_ Object wait/notify/notifyAll
+                *_ Lock的Condition的await/signal/signalAll
+                *_ BlockingQueue
+            * 电商库存设计
+                *_ 缓存库容
+                *_ 消息队列
+        *[#lightblue] 装饰器模式
+            *_ 接口/基类/具体实现类
+        *[#lightblue] 答疑
+            *_ 单例:枚举实现/内部类实现
+            *_ 生产者/消费者模式大流量下延迟高:1提高响应速度2限流拒绝
     *[#pink] 实战演练
 left side
     *[#pink] 3Java编程性能调优
@@ -113,6 +202,144 @@ left side
                 *_ 链表转红黑树
             *[#lightgrey] 扩容
                 *_ e.hash&oldCapacity结果0与其他分流;0在原位,其他在原Index+oldCapacity上
+        *[#lightblue] IO模型
+            *_ NIO:减少内存复制/利用多路复用,防止阻塞
+        *[#lightblue] 序列化
+            *_ 避免使用java序列化:1无法跨语言;2不安全;3体积大;4性能不好
+            *_ ProtoBuf:使用T(类型)L(长度)V(字段值)
+        *[#lightblue] RPC通信协议
+            *_ 避免使用java序列化:1无法跨语言;2不安全;3体积大;4性能不好
+            *_ ProtoBuf:使用T(类型)L(长度)V(字段值)
     *[#pink] JVM性能监测及调优
+        *[#lightblue] 内存模型
+            *[#lightgreen] heap
+                *_ 老年代 Tenured
+                * 新生代
+                    *_ Eden
+                    *_ Survivor(From/To)
+            * Method Area(Java8的MetaSpace)
+                *_ 类信息
+                *_ 线程共享
+                *_ 本地内存,大小由操作系统控制,默认无上限,可以动态扩展
+                *_ 有专门的垃圾收集器
+            *_ Program Counter Register:各个线程字节码地址,分支/循环/跳转/异常/线程恢复
+            *_ VM Stack:线程私有空间
+            *_ Native Method Stack:管理本地方法,C实现
+        *[#lightblue] JIT编译
+            *[#lightgreen] 类
+                * 类加载
+                * 类链接:验证/准备(分配内存+初始值)/解析(符号饮用转直接引用)
+                * 类初始化
+            *[#lightgreen] JIT编辑
+                *_ C1/C2:可以通过JVM参数配置
+                *_ java9AOT运行前静态编译;java10Graal模块化维护
+                *_ 计数器:调用计数/回边(Back Edge比如循环体)计数
+            *[#lightgreen] 优化
+                *_ 方法内联:方法不要太大/可以通过JVM参数配置/尽量使用final&private&static
+                * 逃逸分析
+                    *_ 栈上分配:如果一个变量只在方法中使用,就分配在栈上
+                    *_ 锁消除:单线程访问,取消加减锁
+                    *_ 标量替换:一个对象如果不被外部访问,实际可以直接创建内部标量
+        *[#lightblue] GC
+            *[#lightgreen] 回收范围
+                *_ Heap
+                *_ Method Area(MetaSpace)
+            *[#lightgreen] 回收机制
+                * 判断可否回收的算法
+                    *_ 引用计数(corner case:循环引用)
+                    *_ 可达性分析(目前JVM采用)
+                    * 引用
+                        *_ 强引用 被强引用不会被回收
+                        *_ 软引用 即将OOM会回收
+                        *_ 弱引用 GC即回收
+                        *_ 虚引用 被回收时收到系统通知回收堆外内存
+                * 回收特性
+                    *_ 自动性
+                    *_ 不可预测性
+            *[#lightgreen] 算法
+                *_ 标记清除:优点不需移动;缺点内存碎片
+                *_ 复制算法:优点无内存碎片;缺点需要复制
+                *_ 标记整理:优点集合上面两种;缺点需要移动局部对象
+                *_ 分代收集:对于长时间存活对象效果不明显甚至反作用
+            *[#lightgreen] 性能衡量指标
+                *_ 吞吐量
+                *_ 停顿时间
+                *_ GC频率
+            *[#lightgreen] 查看/分析GC日志
+                *_ JVM参数设置
+                *_ 工具分析相关log
+            *[#lightgreen] 调优策略
+                * 降低MinorGC
+                    *_ 可以扩大Eden大小;但可能增加GC时间,实际要看新对象的存活周期
+                * 降低FullGC
+                    *_ 尽量避免大对象
+                    *_ 增大内存
+                * 选择合适Collector
+                    *_ Serial New/Serial Old:复制/标记-整理
+                    *_ Parallel New/Parallel Old:复制/标记-整理
+                    *_ Parallel Scavenge:复制
+                    *_ CMS:标记清理
+                    *_ G1:标记整理+复制
+        *[#lightblue] 内存分配
+            *_ 用jmap查看队内存分布
+            *_ 可以通过JVM参数配置:如新生代大小,Eden比例
+        *[#lightblue] 内存持续上升,如何排查
+        *[#lightblue] 内存模型
     *[#pink] 数据库性能调优
+        *[#lightblue] 如何写高性能SQL
+            *[#lightgreen] 慢SQL
+                *_ 无索引/索引失效
+                *_ 锁等待
+                *_ 不恰当的SQL
+            *[#lightgreen] 优化步骤
+                * 通过Explain分析SQL执行计划
+                    *_ system>const>eq_ref>ref>range>index>all
+                    *_ system>const表中只有一行匹配,根据索引查询一次即可
+                    *_ eq_ref使用唯一索引
+                    *_ ref非唯一索引/还可见于唯一索引最左原则匹配扫描
+                    *_ range索引范围扫描
+                    *_ index索引全表扫描
+                    *_ all全表扫描
+                *_ 通过show profile分析SQL执行性能
+            *[#lightgreen] 常见优化
+                *_ 优化分页查询 limit应该用id排序
+                *_ 优化select count(*) 超级大表可用近似值/或另行加入统计表
+                *_ 优化select * 应该尽量缩减字段用上索引
+        *[#lightblue] 高并发事务调优
+        *[#lightblue] 索引失效/优化
+        *[#lightblue] 如何避免死锁
+        *[#lightblue] 何时分库分表
+            *_ 单表查询性能受B+数树高影响
+            *[#lightgreen] 优化
+                *_ 分区:单库下分区数有限,适用于非海量数据的大表
+                *_ NoSQL辅助:不支持事务
+            *[#lightgreen] 何时分库分表
+                *_ 首选分区
+                *_ 单表数据量过大考虑分表
+                *_ 大数据量/高并发场景考虑分库分表
+            *[#lightgreen] 如何分库分表
+                * 垂直
+                    *_ 业务分库
+                    *_ 字段拆表
+                * 水平
+                    *_ 某列做为切分条件
+                * 分级
+                    *_ 单库单表
+                    *_ 单库多表
+                    *_ 多库多表
+            *[#lightgreen] 分库分表的问题
+                *_ 分布式事务
+                *_ 跨节点join:冗余表冗余字段
+                *_ 跨节点分页查询:ES/Solr
+                *_ 全局主键ID:UUID/Redis/snowflake
+                *_ 扩容:使用2的倍数
+        *[#lightblue] 表优化案例
+        *[#lightblue] 库参数设置优化
+        *[#lightblue] InnoDB
+    *[#pink] 加餐
+        *[#lightblue] 推荐常用性能测试工具
+            *_ ab(apache bench)
+            *_ Jmeter
+            *_ LoadRunner(商业版)
+            *_ 阿里云PTS
 @endmindmap
