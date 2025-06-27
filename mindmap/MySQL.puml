@@ -1,0 +1,296 @@
+@startmindmap
+*[#lightgrey] MySQL
+    *[#lightpink] 1基础篇
+        *[#lightgreen] 基础架构:一条查询如何执行
+            *[#lightblue] server层
+                *_ 连接器 管理连接/校验权限
+                *_ 查询缓存 8.0版本后,该功能取消
+                *_ 分析器 语法分析
+                *_ 优化器 优化方案
+                *_ 执行器
+            *[#lightblue] 存储引擎
+                *_ InnoDB/MyISAM/Memory
+        *[#lightgreen] 日志系统:一条更新如何执行
+            *[#orange] redo log(引擎层/物理日志)
+                *_ WAL(Write Ahead Logging)
+                *_ Crash Safe
+                *_ write pos/checkpoint 循环写入
+            *[#orange] binlog(Server层/逻辑日志)
+                *_ 追加写入 不会覆盖
+            *[#orange] 两阶段提交
+                *_ (引擎)写redo log prepare阶段
+                *_ (执行器)写binlog
+                *_ (引擎)提交事务 处于commit状态
+        *[#lightgreen] 事务隔离:为什么改了看不见
+            *[#orange] 隔离级别
+                *_ 读未提交
+                *_ 读提交(Oracle默认)
+                *_ 可重复读
+                *_ 串行化
+            *[#orange] 隔离实现
+                *_ MVCC(Multi Version Concurrency Control)记录有版本 undo-log
+                *_ 长事务会导致undo log过大/占用锁资源
+            *[#orange] 事务启动方法
+                *_ 显式启动事务语句 begin/start transaction\n commit/rollback
+                *_ set autocommit 0自动开启事务1需要显式启动事务
+                *_ commit work and chain(autocommit=1的情况下)
+            *[#orange] 避免长事务
+                *[#lightblue] 应用开发端
+                    *_ 设置autocommit=1
+                    *_ 去除不必要的只读事务
+                    *_ 控制语句执行时间 set max_execution_time
+                *[#lightblue] DB端
+                    *_ 监控长事务 information_schema.innodb_trx表
+                    *_ 使用pt-kill工具
+                    *_ 业务功能测试阶段输出general_log分析
+                    *_ 设置innoDB_undo_tablespaces(回滚段表空间数量)为2
+        *[#lightgreen] 深入浅出索引 上
+            *[#orange] 索引模型
+                *_ 哈希表 不适用区间查询
+                *_ 有序数组 不适合频繁更新数据
+                *_ 二叉搜索树 需要保持平衡
+                *_ B+树 适用于磁盘存储
+            *[#orange] InnoDB索引
+                *_ 索引组织表
+                *_ B+树
+                *_ 主键索引和非主键索引的差别:非主键索引的叶子实际是主键值
+            *[#orange] 索引维护
+                *_ 插入数据的维护
+                *_ 页分裂和合并
+            *[#orange] 自增主键的选择
+                *_ 适合有序插入场景
+                *_ 减少存储空间占用
+            *[#orange] 重建索引的方法
+                *_ drop index(primary key)/add index(primary key)
+        *[#lightgreen] 深入浅出索引 下
+            *[#orange] 覆盖索引
+                *_ 减少树的搜索次数
+                *_ 提升查询性能
+            *[#orange] 最左前缀原则
+                *_ 利用最左前缀定位记录
+                *_ 支持联合索引最左N个字段
+                *_ 支持String索引最左M个字符
+            *[#orange] 索引下推
+                *_ 利用索引中字段先做判断
+                *_ 减少回表
+        *[#lightgreen] 全局锁和表锁:加字段的阻碍
+            *[#orange] 全局锁
+                *_ FTWRL(Flush Table With Read Lock)
+                *_ 适用场景:全库逻辑备份
+                *_ 需要注意备份一致性问题
+                *_ mysqldump使用--single transaction参数(InnoDB引擎支持)
+                * readOnly方式 VS FTWRL方式
+                    *_ readOnly可能被用来判断主从库
+                    *_ FTWRL如果客户端异常断开会释放锁
+            *[#orange] 表锁
+                *[#lightblue] 表锁
+                    *_ lock tables...read/write
+                    *_ unlock tables
+                *[#lightblue] 元数据锁(meta data lock)
+                    *_ 读锁 操作加读锁
+                    *_ 写锁 改表结构加写锁
+                    *_ MDL锁的互斥性 读/写锁之间,写锁之间互斥
+                    *_ 长事务和MDL锁 MDL锁在事务提交才释放
+                    *_ 安全的给小表加字段 alter 添加wait_time 字段
+        *[#lightgreen] 行锁功过:如何减少性能影响
+            *[#orange] 两阶段锁协议
+                *_ 需要时加上,事务结束才释放
+                *_ 安排事务的语句顺序 最影响并发的语句放在最后
+            *[#orange] 死锁和死锁检测
+                *_ 死锁超时 innodb_lock_wait_timeout(默认50s)
+                *_ 死锁检测 innodb_deadlock_detect(on)
+                *_ 死锁检测会消耗大量CPU 复杂度O(N^2) N为竞争的并发线程数
+            *_ 优化锁冲突 逻辑上变成多行
+            *_ 删除10_000条数据,一个连接里循环20次每次删除500好于直接删(长事务)和20个连接每个删500(锁竞争)
+        *[#lightgreen] 事务到底隔离还是不隔离
+            *[#orange] 事务启动
+                *_ begin/start transaction命令并不是一个事务的起点,在执行到它们之后的第一个操作InnoDB表的语句,事务才真正启动(trx_id生成)
+                *_ 想要马上启动事务,适用start transaction with consistent snapshot
+            *[#orange] consistent read view
+                *_ 事务启动时生成
+            *[#orange] InnoDB行数据版本
+                *_ 多版本数据,用row trx_id区分
+            *[#orange] 快照在MVCC中的工作原理
+                *_ 事务操作根据隔离级别找到对应读版本的数据
+            *[#orange] 数据版本可见性规则
+                *_ if (未提交 or 已提交但在视图创建后) then 不可见
+            *[#orange] update时 当前读 + 两阶段提交
+    *[#lightpink] 3特别放送
+        *[#lightgreen] 林晓斌:我的MySQL的心路历程
+    *[#lightpink] 4结束语
+        *[#lightgreen] 点线面网,一起构建MySQL知识网络
+left side
+    *[#lightpink] 2实战篇
+        *[#lightgreen] 普通索引/唯一索引:如何选择
+            *[#orange] 查询性能 差异微乎其微,只有key正好在某一页最后一位才有差异
+            *[#orange] 更新性能 更新目标页不在内存中,使用changeBuffer,普通索引省磁盘操作效率高
+            *[#orange] changeBuffer
+                *_ 适用于写多读少的场景,如果写完马上读,还有反作用
+                *_ redo log减少随机写,changeBuffer减少随机读
+                *_ 断电不影响,靠redo-log
+                *_ merge不一定马上flush
+        *[#lightgreen] 为什么MySQL会选错索引
+            *[#orange] 优化器逻辑
+                *_ 扫描行数判断
+                *[#lightblue] 索引统计信息
+                    *_ 基数(cardinality一个索引上不同值的个数)和区分度
+                    *_ 统计方法 默认统计N个页不同值取平均*索引的页面数;更新超过1/M时,重新索引统计
+                    *_ 统计信息更新机制 analyze table
+            *[#orange] 索引异常的处理
+                *_ 适用force index
+                *_ 修改语句引导优化器
+                *_ 新增/delete索引
+        *[#lightgreen] 怎么给字符串字段加索引
+            *_ 完整索引 完整;占用空间大
+            * 前缀索引
+                *_ 占用小;区分度损失,扫描数增加
+                *_ 建议先判断区分度损失,再确定具体长度
+                *_ 有覆盖索引时不推荐
+            *_ 倒序存储 适用于尾部区分度更大的case,比如身份证号;不支持范围
+            *_ hash字段索引 占用小;不支持范围
+        *[#lightgreen] 为什么MySQL会"抖"一下
+            *[#orange] 原因
+                *_ 内存和磁盘数据不一致,被称为脏页
+                *_ 刷脏页flush时,性能下降
+            *[#orange] 刷脏页控制逻辑
+                *[#lightblue] 什么时候flush
+                    *_ redo log满了
+                    *_ 内存满了
+                    *_ 空闲了
+                    *_ 正常关闭
+                *[#lightblue] flush策略
+                    *_ innodb_io_capacity磁盘能力,建议设置为磁盘IOPS(可以由fio工具测试)
+                    *_ 两因素:脏页比例和redo log待写入的大小
+                    *_ innodb_flush_neighbors,是否flush相邻页,机械硬盘适用,SSD建议关闭
+            *[#orange] 监控脏页比例
+                *_ Innodb_buffer_pool_pages_dirty/Innodb_buffer_pool_pages_total
+        *[#lightgreen] 为什么表数据删掉一半,表文件大小不变
+            *[#orange] 表数据存储方式
+                *[#lightblue] innodb_file_per_table
+                    *_ off 放在系统共享表空间,和数据字典一起
+                    *_ on 每个表独立存储.ibd后缀的文件;5.6.6版本后默认on
+            *[#orange] 数据删除流程
+                *_ 标记数据页(可以任意复用)和记录(符合范围的)为可复用
+                *_ insert也可以导致数据空洞
+            *[#orange] 减小数据空洞方式:重建表
+                *[#lightblue] alter table A engine=InnoDB
+                    *_ 5.5版本前,更改期间会丢失修改 server层 copy
+                    *_ 5.6版本后 不丢失更改 InnoDB内部 inplace
+                    *_ 加MDL读锁:可以update,但不能改表结构
+            *[#orange] 其他重建方法
+                *_ analyze table 重新统计索引;加MDL读锁
+                *_ optimize table: recreate+analyze
+        *[#lightgreen] count(*)慢怎么办
+            *[#orange] 如何得来
+                *_ MyISAM直接记下一个数字,需要时返回
+                *_ show table status很快,但不准(基于索引页采样估计)
+                *_ InnoDB count(*) 扫表,准确(因为要MVCC)但慢
+                *_ count(*)最优
+            *[#orange] 学习MyISAM:事务写表计数
+        *[#lightgreen] 日志和索引相关问题答疑
+            *[#orange] 两阶段提交
+                *_ 崩溃时如何恢复:redo-log prepare时需要查看binlog,完整则提交/不完整回滚
+                *_ 如何判断binlog完整, statement格式有commit,row格式有XID event;5.6.2后还有binlog-checksum
+                *_ redo-log和binlog如何关联:XID
+                *_ binlog完整为什么算提交,因为binlog可能被从库使用了已经
+                * 为什么要两个日志
+                    *_ 历史原因MySQL引擎不支持崩溃恢复,InnoDB引入后,既然binlog没有恢复能力,就使用InnoDB自带的redo-log
+                    *_ 只用binlog行不行:功能上redo-log有checkpoint,之前的记录必定已经刷盘,binlog则无,所以只用binlog无法恢复数据页
+                    *_ 只用redo-log行不行:无法归档
+                *_ redo-log尽量设置大一点
+                *_ 刷盘是从内存,而不是redo-log
+                *_ redo-log buffer是什么:数据先写到内存(多线程共享),prepare时再持久化到redo-log文件里
+        *[#lightgreen] "order by"如何工作
+            *[#orange] 全字段排序
+                *_ 初始化sort buffer
+                *_ 查到数据放入sort buffer
+                *_ 排序并取limit返回
+            *[#orange] rowId排序(需要回表,但省sort buffer空间)
+                *_ 初始化sort buffer
+                *_ 查到排序字段和主键放入sort buffer
+                *_ 排序并取limit,回表拿到数据返回
+        *[#lightgreen] 如何正确显示随机消息
+            *_ 从一个单词表中随机选出三个单词
+            * select word from words order by rand() limit 3;
+                *_ 用到内存临时表
+                *_ 对于InnoDB优先用全字段排序,减少回表
+                *_ tmp_table_size这个配置限制了内存临时表的大小,超过时,转磁盘临时表
+                *_ 5.6版本后引入优先队列算法
+            * 随机方法1
+                *_ 取得这个表的主键id的最大值M和最小值N
+                *_ 用随机函数生成一个最大值到最小值之间的数X=(M-N)*rand()+N
+                *_ 取不小于X的第一个ID的行
+                *_ ID可能有空洞,所以不同行概率不同
+            * 随机方法2
+                *_ 取得整个表的行数,并记为C
+                *_ 取得Y=floor(C*rand()).floor函数在这里的作用,就是取整数部分
+                *_ 再用limitY,1取得一行
+                *_ 因为获取总行数需要扫描;limit需要跳过,所以性能比1差
+        *[#lightgreen] 为什么这些SQL逻辑相同,性能差异巨大
+            *_ 条件字段函数操作:函数操作破坏了索引的有序性
+            *_ 隐式类型转换 字符串和数字比较,字符串先转换成数字
+            *_ 隐式字符编码转换 utf8mb4是utf8的超集
+        *[#lightgreen] 为什么只查一行数据,执行这么慢
+            *[#orange] 查询长时间不返回
+                *_ 等MDL锁  show processlist
+                *_ 等flush
+                *_ 等行锁
+            *[#orange] 查询慢
+                *_ 全表扫描 慢查询日志
+                *_ 扫描一行但执行慢 可能是一致性读 lock in share mode可以拿到当前值
+                *_ 加锁读
+        *[#lightgreen] 幻读是什么,有什么问题
+            *_ 同事务里,同一查询不同时刻行数不一致
+            * 解决方法:gap lock(只在可重复读级别)
+                *_ 只和insert冲突,gap lock间不冲突
+                *_ 和行锁合称next-key lock,前开后闭区间
+                *_ 容易死锁,影响并发
+        *[#lightgreen] 为什只改一行的语句,锁这么多
+            *[#orange] 加锁原则
+                *_ 基本单位是next-key lock,加在索引上(有时需要绕过覆盖索引优化)
+                *_ 查找过程访问到的对象才会加锁
+                *_ 索引上等值查询,给唯一索引加锁时,退化为行锁
+                *_ 索引上等值查询,向右遍历时,最后一个值不满足等值条件的时候,next-key lock退化为间隙锁
+                *_ delete时用limit可以缩小锁范围
+                *_ 加锁两阶段:先加间隙锁,再加行锁
+        *[#lightgreen] 有哪些饮鸩止渴提高性能的方法
+            *[#orange] 短链接风暴
+                *_ 连接数暴涨;max_connections参数
+                *_ 断开不工作的线程(show processlist):先断事务外的(information_schema库的innodb_trx表),后断事务内的(kill connection+id)
+                *_ 减少连接损耗,如取消权限验证
+            *[#orange] 慢查询
+                *[#lightblue] 索引没设计好
+                    *_ 备库set sql_log_bin=off,然后alter table加索引
+                    *_ 主备切换后重复上述操作
+                    *_ 考虑ghost这样的方案(建临时表,然后切换)
+                *[#lightblue] SQL语句没写好
+                    *_ query_rewrite:把输入的语句改成另外一种模式
+                *[#lightblue] MySQL选错索引
+                    *_ force index
+                    *_ 事先测试
+            *[#orange] QPS突增
+                *_ ip白名单限制;账号限制;重写SQL语句
+        *[#lightgreen] 怎么保证数据不丢
+        *[#lightgreen] 怎么保证主备一致
+        *[#lightgreen] 怎么保证高可用
+        *[#lightgreen] 备库为什么会延迟好几个小时
+        *[#lightgreen] 主库出问题了,从库怎么办
+        *[#lightgreen] 读写分离有哪些坑
+        *[#lightgreen] 如何判断一个数据库是不是出问题了
+        *[#lightgreen] 答疑二:用动态的观点看加锁
+        *[#lightgreen] 误删数据后怎么办
+        *[#lightgreen] 为什么有kill不掉的语句
+        *[#lightgreen] 我查这么多数据,会不会把数据库内存打爆
+        *[#lightgreen] 到底可不可以用join
+        *[#lightgreen] join语句如何优化
+        *[#lightgreen] 为什么临时表可以重名
+        *[#lightgreen] 什么时候使用内部临时表
+        *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
+        *[#lightgreen] 自增主键为什么不是连续的
+        *[#lightgreen] insert语句的锁为什么这么多
+        *[#lightgreen] 如何最快复制一张表
+        *[#lightgreen] grant之后要跟着flush privileges吗
+        *[#lightgreen] 要不要使用分区表
+        *[#lightgreen] 答疑三:说一说这些好问题
+        *[#lightgreen] 自增id用完怎么办
+@endmindmap
