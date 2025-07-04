@@ -271,10 +271,86 @@ left side
             *[#orange] QPS突增
                 *_ ip白名单限制;账号限制;重写SQL语句
         *[#lightgreen] 怎么保证数据不丢
+            *[#orange] binlog
+                *_ 先写binlog cache,事务提交时写bin log文件,并清空cache
+                *_ binlog cache每个线程一个,binlog_cache_size参数控制大小,超过暂存磁盘
+                *_ write指写入文件系统page cache,fsync是持久化到硬盘
+                *[#lightblue] sync_binlog参数
+                    *_ 0表示每次提交事务只write,不fsync
+                    *_ 1表示都fsync
+                    *_ N(N>1)表示每次都write,累计N后fsync;若主机异常重启会丢失N个事务的binlog日志
+            *[#orange] redo-log
+                *[#lightblue] 先写redo-log buffer(全局共用),事务没提交也可能持久化到硬盘
+                    *_ innoDB有一个后台进程,每隔一秒,write&fsync
+                    *_ redo-log buffer达到innodb_log_buffer_size一半的时候,write
+                    *_ 并行的事务提交时,顺带持久化到硬盘
+                *[#lightblue] innodb_flush_log_at_trx_commit
+                    *_ 0表示只写redo-log buffer
+                    *_ 1表示直接持久化到磁盘
+                    *_ 2表示只写page cache(主机掉电会丢失数据)
+            *[#orange] group commit机制
+                *_ log sequence number lsn
+                *_ 一起提交
+                * binlog
+                    *_ binlog_group_commit_sync_delay 多少微秒后fsync
+                    *_ binlog_group_commit_sync_no_delay_count累计多少次
+                    *_ 两者或的关系,使用会增加响应时间
+                *_ WAL机制性能两方面:顺序写+组提交
+            *[#orange] 问题
+                *_ update后idb文件没变化;可能是WAL机制导致
+                *_ 为何binlog每线程自己维护,redo-log buffer全局共用;binlog(逻辑日志)不能被打断
+                * 什么业务场景下innodb_flush_log_at_trx_commit/sync_binlog不都为1
+                    *_ 可预见的业务高峰期
+                    *_ 备库延迟
+                    *_ 用备库恢复主库的副本,应用binlog过程
+                    *_ 批量导入数据
+                    *_ 可以设置innodb_flush_logs_at_trx_commit=2;sync_binlog=1000
         *[#lightgreen] 怎么保证主备一致
+            *_ binlog格式statement(逻辑,省数据,但同步可能导致不一致)/row(具体,但占用大,可以恢复数据)/mixed(mysql自动判断)
+            *_ binlog有上下文,比如now()函数会set timestamp,来解决主备同步延迟时的数据一致性问题,所以不能直接复制语句
+            *_ binlog做主备同步,server id防止循环复制;注意server id变化可能导致问题,比如2节点改3节点
         *[#lightgreen] 怎么保证高可用
+            *[#orange] 主备延迟
+                *_ 延迟过大的核心是备库消费能力小于主库生产能力
+                *_ 主备库有性能差异
+                *_ 备库压力大,比如跑一些统计查询
+                *_ 大事务:在主库执行时间就长;比如delete大量数据/大表DDL
+                *_ 备库的并行复制能力
+            *[#orange] 切换策略
+                *[#lightblue] 可靠性优先
+                    * 步骤
+                        *_ 1确保延迟时间少于某个预期值
+                        *_ 2主库改为只读
+                        *_ 3等待从库延迟变为0
+                        *_ 4从库改成可以读写
+                        *_ 5业务请求切换到从库
+                    *_ 延迟时间内服务不可用;数据一致性好
+                *[#lightblue] 可用性优先
+                    *_ 直接上面4和5
+                    *_ 可能数据不一致,binlog row格式更容易发现不一致
         *[#lightgreen] 备库为什么会延迟好几个小时
+            *[#orange] 多线程消费主库binlog
+                *[#lightblue] 原则
+                    *_ 操作同一行的不同事务不能分配到不同worker
+                    *_ 同一个事务不能分配到不同worker
+                *_ 按库分worker
+                *[#lightblue] 基于group commit
+                    *_ 同一组提交的事务,一定不会修改同一行
+                    *_ 主库上可以并行的事务,从库也一定可以并行
+                    *_ 基于commit id将一组事务分发到不同worker
+                    * 问题
+                        *_ 主库一组事务提交时,下一组事务处于执行中状态
+                        *_ 从库只会等前一组事务执行完毕,执行下一组事务
+                        *_ 所以从库的并发度不如主库,容易被大事务拖住
+                *[#lightblue] 提升并发
+                    *_ 同时prepare的事务可以并行
+                    *_ 处于prepare的事务和处于commit的事务也可以并行
+                    * binlog-transaction-dependency-tracking
+                        *_ COMMIT_ORDER:根据prepare和commit判断是否可以并行策略
+                        *_ WRITESET:对于事务操作的每一行,计算hash,判断有无交集,若没有则可并行(必须有主键,且没有外键)
+                        *_ WRITESET_SESSION:在WRITESET基础上,多了一个约束:主库上同一个线程先后执行的事务,在从库上要保证相同的执行顺序
         *[#lightgreen] 主库出问题了,从库怎么办
+
         *[#lightgreen] 读写分离有哪些坑
         *[#lightgreen] 如何判断一个数据库是不是出问题了
         *[#lightgreen] 答疑二:用动态的观点看加锁
@@ -291,6 +367,10 @@ left side
         *[#lightgreen] 如何最快复制一张表
         *[#lightgreen] grant之后要跟着flush privileges吗
         *[#lightgreen] 要不要使用分区表
+            *_ 引擎层是N个表,server层是1个表
+            *_ 分区表gap-lock是在引擎层单表上
+            *_ 每当第一次访问分区表时,会依次打开所有分区
+            *_ MDL锁会锁住所有的分区
         *[#lightgreen] 答疑三:说一说这些好问题
         *[#lightgreen] 自增id用完怎么办
 @endmindmap
