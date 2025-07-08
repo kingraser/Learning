@@ -350,13 +350,116 @@ left side
                         *_ WRITESET:对于事务操作的每一行,计算hash,判断有无交集,若没有则可并行(必须有主键,且没有外键)
                         *_ WRITESET_SESSION:在WRITESET基础上,多了一个约束:主库上同一个线程先后执行的事务,在从库上要保证相同的执行顺序
         *[#lightgreen] 主库出问题了,从库怎么办
-
+            *_ case:一主多从,主库A切换为A',其余从库如何将要同步到主库切换到A'
+            *[#lightblue] 基于GTID(Global Transaction ID)
+                *_ server_uuid(实例启动时生成,全局唯一):gno(整数,从1开始,事务提交时分配并加一)
+                *_ gtid_mode=on和enforce_gtid_consistency=on
+                *_ 生成两种case:gtid_next=automatic(自动加一分配);set gtid_next='current_gtid'(gtid已经存在则ignore,若有则用设定值)
+                *_ CHANGE MASTER TO MASTER_HOST=$host_name MASTER_PORT=$port MASTER_USER=$user_name MASTER_PASSWORD=$password master_auto_position=1
+                *_ 执行start slave,从库把gtid set发给主库,主库判断是自己的子集与否.若是则同步从库没有的部分;若不是则报错
         *[#lightgreen] 读写分离有哪些坑
+            *_ 两种架构:1client直连从库(少一层性能好,结构简单;变更会有client感知);2client连proxy(client友好;结构复杂)
+            *[#lightblue] 过期读
+                *_ 走master
+                *_ sleep
+                * 判断主备延迟
+                    *_ show slave status:seconds_behind_master
+                    *_ 对比点位
+                    *_ 对比GTID set
+                * semi sync:有从库ack了再给client返回
         *[#lightgreen] 如何判断一个数据库是不是出问题了
+            *[#lightblue] select 1
+                *_ 优点:简单
+                *_ 缺点:只能判断出库的进程还在,不能判断主库没有问题
+                *_ 例如:innodb_thread_concurrency已经满了,但是select 1可以正常返回
+                *_ innodb_thread_concurrency默认为0表示不限制,推荐64-128
+                *_ 锁等待状态,并发计数减一
+            *[#lightblue] 自定义一个表health & select * from health
+                *_ 优点:能查出并发过多导致数据库不可用的情况
+                *_ 缺点:查不出binlog导致磁盘满了的情况,因为系统可以正常读
+            *[#lightblue] 自定义一个表health & update health set updateTime = now()
+                *_ 优点:能查出binlog占满磁盘的情况
+                *_ 缺点:主备同步时可能因为update导致行冲突
+                *_ 改进方法,多行数据,以server id为主键,每台机器更新自己的行
+            *[#lightblue] 内部统计
+                *_ 上面的方法可以判断状态,但是不好判断update慢\n 比如IO利用率100%的场景,检测语句仍有可能很快返回\n 因为检测语句资源占用不大,如果拿到资源就能很快返回
+                *_ performance_schema库file_summary_by_event_name表;开启慢10%
+                *_ 可以通过update setup_instruments set ENABLED='YES', Timed='YES'来控制开关
         *[#lightgreen] 答疑二:用动态的观点看加锁
+            *_ 加锁是扫描时一个个加上去的,所以为了避免死锁,访问同一组资源的访问顺序尽量相同
+            *_ 如何查看死锁:show engine innodb status命令LATESTDETECTED DEADLOCK
+            *_ innoDB会自动选择回滚成本更小的方案避免死锁
+            *_ 间隙锁是由后继的记录定义的,所以删除记录可能导致锁范围扩大,空表锁住所有
         *[#lightgreen] 误删数据后怎么办
+            *[#lightblue] delete误删行
+                *_ 使用Flashback恢复,需要binlog_format=row和binlog_row_image=FULL
+                *_ 不建议直接在主库上操作,先在临时库上恢复,确认后再恢复到主库;防止数据二次破坏
+                *_ 预防:sql_safe_updates参数设置为on,无where或where没有索引字段,报错
+                *_ 预防:sql上线前评审
+            *[#lightblue] drop/truncate误删表&库
+                *_ 需要定期的全量备份和binlog备份
+                *_ 找到最近的全量备份,再用binlog备份复原
+                *_ 加速恢复:mysqlbinlog命令可以通过-database参数指定库
+                *_ 记得跳过误删语句
+                * 比较慢
+                    *_ 因为误删表的话,最好只重放该表而不是库,但mysqlbinlog不能指定表
+                    *_ mysqlbinglog单线程
+                * 加速方法
+                    *_ 从备份恢复出临时实例,将该实例设置为线上备库的从库
+                    *_ start slave之前,change replication filter replicate_do_table = (tbl_name)
+                    *_ 这样可以并行
+                    *_ 如果备库binlog不全,可以手动放入再重启,即可重新识别binlog文件
+                * 延迟恢复备库
+                    *_ CHANGE MASTER TO MASTER_DELAY=N命令,可以指定这个备库持续保持跟主库有N秒的延迟
+                    *_ 这样最多追N的时间即可恢复
+                *_ 预防:账号分离,常见开发账号只有DML权限没有DDL权限
+                *_ 预防:操作规范:如删除必须先改名,比如后面加to_be_deleted\n 一段时间无问题,才必须从管理系统删除\n 管理系统也只能删带有后缀的表or库
+            *[#lightblue] rm命令误删mysql实例
+                *_ 删掉节点:整个集群选个新主库
+                *_ 删掉集群:备份跨机房/跨城市
+            *[#lightblue] 预防
+                *_ 四个脚本:备份/执行/验证/回滚
+                *_ 用chatrr +i给重要文件加保护,这样root也没法直接删除
         *[#lightgreen] 为什么有kill不掉的语句
+            *_ kill query+线程id;终止语句
+            *_ kill connection+线程id;connection可以缺省,终止线程连接
+            *[#lightblue] kill后的操作
+                *_ 1将线程状态改为kill_query
+                *_ 2给执行线程发一个信号
+            *[#lightblue] 为何kill了却还能在show processlist结果里看到
+                * 1线程执行中有一些判断逻辑,发现状态kill了,再进入终止逻辑
+                    *_ 如IO压力大,IO函数一直没有返回,不能即使判断线程状态
+                *_ 2如果处于等待状态,必须是可以被唤醒的线程
+                * 3执行终止逻辑需要一个过程
+                    *_ 超大事务回滚
+                    *_ 大查询回滚,清理临时文件
+                    *_ DDL执行到最后阶段,被kill需要删除中间临时文件,可能受IO资源影响耗时久
+            *[#lightblue] client ctrl+c
+                *_ MySQL是停等协议,还没有返回的时候,不能继续下一个命令
+                *_ client另外启动一个连接,再执行kill query命令
+            *[#lightblue] client 库里表多就建立连接慢
+                * 客户端有命令表名补全功能
+                    *_ show databases;
+                    *_ show tables;
+                    *_ 内存建立hashTable;所以表多会慢
+                *_ 用-A参数可以取消
+                * 用-quick参数
+                    *_ 跳过表名补全功能
+                    *_ mysql_use_result(本地不缓存)
+                    *_ 不会把执行命令记录到本地历史文件
+            *[#lightblue] kill慢时
+                *_ 调大并发度,或者停掉别的线程,让出位子给这个线程执行
+                *_ 若受限于IO等资源执行慢,只能减少系统压力
+                *_ 若kill,导致事务回滚很慢,应该等吗?应该,因为不等,直接关闭,重启后,该有的操作一样会继续
         *[#lightgreen] 我查这么多数据,会不会把数据库内存打爆
+            *[#lightblue] 流程
+                *_ 获取一行,写到net_buffer中.大小是由参数net_buffer_length定义的,默认是16k
+                *_ 重复获取行,直到net_buffer写满,调用网络接口发出去
+                *_ 如果发送成功,就清空net_buffer,然后继续取下一行,并写入net_buffer
+                *_ 如果发送函数返回EAGAIN或WSAEWOULDBLOCK,就表示本地网络栈(socket send buffer)写满了,进入等待.直到网络栈重新可写,再继续发送
+            *_ 由于边读边发,所以client可能会成为瓶颈;状态Sending to client/Sending data只是正在执行的意思
+            *_ InnoDB使用LRU算法更新BufferPool,内存命中率一般需要99%以上,innodb_buffer_pool_size推荐物理内存的60%-80%
+            *_ 通过分代,防止大表扫描导致内存命中率下降
         *[#lightgreen] 到底可不可以用join
         *[#lightgreen] join语句如何优化
         *[#lightgreen] 为什么临时表可以重名
