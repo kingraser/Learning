@@ -466,6 +466,27 @@ left side
         *[#lightgreen] 什么时候使用内部临时表
         *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
         *[#lightgreen] 自增主键为什么不是连续的
+            *[#lightblue] 自增值存在哪里
+                *_ MyISAM 在数据文件
+                *_ InnoDB在内存,若重启,设为current_max()+1;8.0版本后,持久化到redo-log
+            *[#lightblue] 自增值修改机制
+                *_ 若为0/null/未制定,设定为自增值
+                *_ 否则设定为指定值
+                * 然后变更自增值;
+                    *_ if(指定值小于自增值) then do noting
+                    *_ else 从auto_increment_offset(默认1)开始,以auto_increment_increment(默认1)为步长,持续叠加,直到找到第一个大于指定值的值,作为新的自增值
+            *[#lightblue] 不连续的原因
+                *_ 主键冲突
+                *_ 事务回滚:为什么自增值不能回退?因为可能有别的事务更新了自增值
+                *_ 批量插入(insert select)(不清楚申请多少,实际是类似java hashmap resize,二进制翻倍申请)
+            *[#lightblue] 自增锁的优化
+                * innodb_autoinc_lock_mode参数,版本5.1引入,默认1
+                    *_ 0:和5.0一样,语句结束才释放锁
+                    *_ 1:普通insert,申请后就释放;insert select,语句结束才释放(应用场景:主从复制,binlog是statement格式)
+                    *_ 2:申请就释放
+            *[#lightblue] insert select在可重复读隔离级别+binlog是statement格式时,会对所有记录和间隙加锁
+                *_ 因为如果不加锁,主从复制场景,由于可重复读,主库看不到事务执行中新插入的记录
+                *_ 但是binlog同步到从库,statement格式,从库会插入事务执行中新插入的数据,导致数据不一致
         *[#lightgreen] insert语句的锁为什么这么多
         *[#lightgreen] 如何最快复制一张表
         *[#lightgreen] grant之后要跟着flush privileges吗
