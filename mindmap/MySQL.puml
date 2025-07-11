@@ -521,6 +521,17 @@ left side
                 *_ binlog format=statement/mixed时,临时表操作语句才进入binlog
             *_ 临时表可以alter table改名,但不能直接rename
         *[#lightgreen] 什么时候使用内部临时表
+            *[#lightblue] union
+                *_ 内部临时表上面有唯一索引,实现去重语义
+                *_ 若union all,则无去重,则不用内部临时表
+            *[#lightblue] group by
+                *_ 内部临时表上面有唯一索引,实现分组语义
+                *_ 返回默认排序,若无需排序,可以加order by null
+                *_ 若group by字段有索引,则无需内部临时表
+                *_ select后加SQL_BIG_RESULT(hint),可直接使用磁盘数组:获得所有值后排序,再顺序统计group by,而非B+树的内部临时表
+            *_ 如果可以一边读数据一边得到结果,就不需要额外内存,否则就需要,来保存中间结果
+            *_ join_buffer是无序数组,sort_buffer是有序数组,临时表是二维表结构
+            *_ 内存临时表按照扫描顺序,磁盘临时表则按照主键顺序
         *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
         *[#lightgreen] 自增主键为什么不是连续的
             *[#lightblue] 自增值存在哪里
