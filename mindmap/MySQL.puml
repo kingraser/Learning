@@ -457,11 +457,37 @@ left side
                 *_ 重复获取行,直到net_buffer写满,调用网络接口发出去
                 *_ 如果发送成功,就清空net_buffer,然后继续取下一行,并写入net_buffer
                 *_ 如果发送函数返回EAGAIN或WSAEWOULDBLOCK,就表示本地网络栈(socket send buffer)写满了,进入等待.直到网络栈重新可写,再继续发送
-            *_ 由于边读边发,所以client可能会成为瓶颈;状态Sending to client/Sending data只是正在执行的意思
+            *_ 由于边读边发,所以client可能会成为瓶颈(乃至导致长事务,导致server端能力下降);状态Sending to client/Sending data只是正在执行的意思
             *_ InnoDB使用LRU算法更新BufferPool,内存命中率一般需要99%以上,innodb_buffer_pool_size推荐物理内存的60%-80%
             *_ 通过分代,防止大表扫描导致内存命中率下降
         *[#lightgreen] 到底可不可以用join
+            *[#lightblue] 流程
+                *_ 优化器选择小表作为驱动表, 如果用straight join则可以手动指定
+                *_ 小表指的是总数据量,因此有可能表A100行,1个字段;表B虽然50行,但是有3个字段,通算表A是小表
+                *_ 从驱动表1读出一行,去被驱动表2里找到相应数据
+                *_ 加入结果集,并重复上述过程
+            *[#lightblue] 如何从被驱动表找数据
+                *_ 能用索引的话用索引(这种情况可以join)
+                * 不能能用索引的话(这种join尽量不用,可能导致内存命中率下降)
+                    * 将驱动表数据全部放入内存
+                        *_ 放不下的case,分段放
+                        *_ join_buffer_size控制,默认256k
+                    *_ 扫描被驱动表并与内存中数据join
         *[#lightgreen] join语句如何优化
+            *[#lightblue] Multi-Range Read(MRR)优化
+                *_ 根据索引a,定位到满足条件的记录,将id值放入read_rnd_buffer中;(read_rnd_buffer_size参数控制,满了则循环操作)
+                *_ 将read_rnd_buffer中的id进行递增排序;
+                *_ 排序后的id数组,依次到主键id索引中查记录,并作为结果返回.
+            *[#lightblue] Batched Key Access(BKA)优化
+                *_ 驱动表数据放到join_buffer
+                *_ 用MRR方式从被驱动表找数据
+            *[#lightblue] 想用join,但被驱动表无索引,加索引又因为是低频业务不值得操作,怎么办
+                *_ 将被驱动表对应数据查出,放在临时表
+                *_ 临时表加索引再join
+            *[#lightblue] hash_join
+                *_ join操作只能轮询是慢的根源,能hash会快很多
+                *_ MySQL 8.0支持hash join了
+                *_ 更早的版本只能手动在程序里模拟
         *[#lightgreen] 为什么临时表可以重名
         *[#lightgreen] 什么时候使用内部临时表
         *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
