@@ -488,7 +488,38 @@ left side
                 *_ join操作只能轮询是慢的根源,能hash会快很多
                 *_ MySQL 8.0支持hash join了
                 *_ 更早的版本只能手动在程序里模拟
+            *[#lightblue] 三表join语句如何加索引
+                *_ select * from t1 join t2 on(t1.a=t2.a) join t3 on (t2.b=t3.b) where t1.c>=X and t2.c>=Y and t3.c>=Z;
+                *_ 在t1.c>=X、t2.c>=Y、t3.c>=Z这三个条件里,选择一个经过过滤以后,数据最少的那个表,作为第一个驱动表.此时,可能会出现如下两种情况
+                * 第一种情况,如果选出来是表t1或者t3,那剩下的部分就固定了
+                    *_ t1是驱动表,t1->t2->t3,此时在被驱动表上t2.a和t3.b建索引
+                    *_ t3是驱动表,t3->t2->t1,此时在被驱动表上t2.b和t1.a建索引
+                *_ 如果选出来的第一个驱动表是表t2的话,由于t2既可以先join t1,又可以join t3,所以选更小的表驱动
         *[#lightgreen] 为什么临时表可以重名
+            *[#lightblue] 临时表的特性
+                * 临时表和内存表的不同
+                    *_ 内存表create table ... engine=memory,数据在内存,重启被清空,但表结构还在
+                    *_ 临时表可以用任何引擎,写数据时写盘,重启自动回收
+                *_ create temporary table ...
+                *_ 只能被创建的session访问,对其他线程不可见
+                *_ 可以和普通表重名
+                *_ sessionA同时有同名临时表和普通表时,show create以及增删改查访问的临时表
+                *_ show tables不显示临时表
+            *[#lightblue] 临时表应用
+                *_ 跨库查询:各库查询结果放入临时表,再进行后续操作
+                *_ 复杂查询的优化:如join查询,被驱动表没有索引,可以将查到数据放入临时表,临时表加索引,再join
+            *[#lightblue] 临时表为什么可以重名
+                *_ 表定义文件,放在临时文件目录下,#sql{进程id}_{线程id}_序列号.frm
+                * 数据文件
+                    *_ 5.6及之前,临时文件目录下,相同前缀的.ibd文件
+                    *_ 5.7开始,有一个临时文件空间,专门存放临时文件的数据,不需要再创建idb文件(防止频繁使用临时表,创建/删除文件,带来大量磁盘性能消耗)
+                * table_def_key
+                    *_ 普通表库名+表名
+                    *_ 临时表在普通表基础上,加server_id+thread_id
+            *[#lightblue] 临时表和主备复制
+                *_ binlog format=row时,临时表语句不进入binlog
+                *_ binlog format=statement/mixed时,临时表操作语句才进入binlog
+            *_ 临时表可以alter table改名,但不能直接rename
         *[#lightgreen] 什么时候使用内部临时表
         *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
         *[#lightgreen] 自增主键为什么不是连续的
