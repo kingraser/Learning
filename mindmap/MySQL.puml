@@ -533,6 +533,16 @@ left side
             *_ join_buffer是无序数组,sort_buffer是有序数组,临时表是二维表结构
             *_ 内存临时表按照扫描顺序,磁盘临时表则按照主键顺序
         *[#lightgreen] 都说innoDB好,那还要不要用Memory引擎
+            *_ 内存表的数据部分以数组的方式单独存放,而主键id索引里,存的是每个数据的位置.主键id是hash索引,索引上的key并不是有序的
+            *_ InnoDB 表的数据总是有序存放的,而内存表的数据就是按照写入顺序存放的
+            *_ 当数据文件有空洞的时候,InnoDB 表在插入新数据的时候,为了保证数据有序性,只能在固定的位置写入新值,而内存表找到空位就可以插入新值
+            *_ 数据位置发生变化的时候,InnoDB 表只需要修改主键索引,而内存表需要修改所有索引
+            *_ InnoDB表用主键索引查询时需要走一次索引查找,用普通索引查询的时候,需要走两次索引查找.而内存表没有这个区别,所有索引的“地位”都是相同的
+            *_ InnoDB 支持变长数据类型,不同记录的长度可能不同;内存表不支持Blob和Text字段,并且即使定义了varchar(N),实际也当作char(N),也就是固定长度字符串来存储,因此内存表的每行数据长度相同
+            *_ 主键hash索引,不支持范围搜索.可以使用alter table t1 add index a_btree_index using btree (id)新建b树索引
+            *_ 不支持行锁,只有表锁
+            *_ 因为重启数据丢失,担心主备不一致,重启后binlog记录delete from t1
+            *_ 适用于用户临时表case
         *[#lightgreen] 自增主键为什么不是连续的
             *[#lightblue] 自增值存在哪里
                 *_ MyISAM 在数据文件
@@ -552,10 +562,21 @@ left side
                     *_ 0:和5.0一样,语句结束才释放锁
                     *_ 1:普通insert,申请后就释放;insert select,语句结束才释放(应用场景:主从复制,binlog是statement格式)
                     *_ 2:申请就释放
-            *[#lightblue] insert select在可重复读隔离级别+binlog是statement格式时,会对所有记录和间隙加锁
+        *[#lightgreen] insert语句的锁为什么这么多
+            *[#lightblue] insert select在可重复读隔离级别+binlog是statement格式时,会对select表所有扫描到的记录和间隙加锁
                 *_ 因为如果不加锁,主从复制场景,由于可重复读,主库看不到事务执行中新插入的记录
                 *_ 但是binlog同步到从库,statement格式,从库会插入事务执行中新插入的数据,导致数据不一致
-        *[#lightgreen] insert语句的锁为什么这么多
+            *[#lightblue] insert t select t
+                *_ insert into t(c,d)  (select c+1, d from t force index(c) order by c desc limit 1)
+                *_ 上述语句会使用临时表&锁全表
+                *_ 原因是这类一边遍历数据,一边更新数据的情况,如果读出来的数据直接写回原表,就可能在遍历过程中,读到刚刚插入的记录,新插入的记录如果参与计算逻辑,就跟语义不符
+                *_ 可以用临时表优化\n create temporary table temp_t(c int,d int) engine=memory;\n insert into temp_t  (select c+1, d from t force index(c) order by c desc limit 1);\n insert into t select * from temp_t;\n drop table temp_t;
+            *[#lightblue] insert唯一键冲突
+                *_ 冲突后,会在冲突索引上加读锁(可能导致死锁)
+                *_ 这样可以防止该记录被别的事务删掉,维护可重复读的语义
+            *[#lightblue] insert on duplicate key update
+                *_ 冲突后,会在冲突索引上加next-key lock写锁
+                *_ 多个唯一键冲突,update和第一个索引冲突的行
         *[#lightgreen] 如何最快复制一张表
         *[#lightgreen] grant之后要跟着flush privileges吗
         *[#lightgreen] 要不要使用分区表
