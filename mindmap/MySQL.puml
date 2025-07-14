@@ -117,13 +117,27 @@
             *[#orange] update时 当前读 + 两阶段提交
     *[#lightpink] 3特别放送
         *[#lightgreen] 林晓斌:我的MySQL的心路历程
+            *[#orange] 为什么要了解原理
+                *_ 更好定位问题
+                *_ 更巧妙解决问题
+                *_ 看得懂源码让你有更多方法
+            *[#orange] 学习路径
+                *_ 用,发现问题
+                *_ 实践,看官方手册
+            *[#orange] DBA修炼
+                *_ 业务要懂DB,DBA要懂业务
+                *_ 看源码要懂C/C++,熟悉调试工具
     *[#lightpink] 4结束语
         *[#lightgreen] 点线面网,一起构建MySQL知识网络
+            *_ 路径千万条,实践第一条
+            *_ 原理说不清，双手白费劲
+            *_ 知识没体系，转身就忘记
+            *_ 手册补全面，案例扫盲点
 left side
     *[#lightpink] 2实战篇
         *[#lightgreen] 普通索引/唯一索引:如何选择
-            *[#orange] 查询性能 差异微乎其微,只有key正好在某一页最后一位才有差异
-            *[#orange] 更新性能 更新目标页不在内存中,使用changeBuffer,普通索引省磁盘操作效率高
+            *_ 查询性能 差异微乎其微,只有key正好在某一页最后一位才有差异
+            *_ 更新性能 更新目标页不在内存中,使用changeBuffer,普通索引省磁盘操作效率高
             *[#orange] changeBuffer
                 *_ 适用于写多读少的场景,如果写完马上读,还有反作用
                 *_ redo log减少随机写,changeBuffer减少随机读
@@ -351,7 +365,7 @@ left side
                         *_ WRITESET_SESSION:在WRITESET基础上,多了一个约束:主库上同一个线程先后执行的事务,在从库上要保证相同的执行顺序
         *[#lightgreen] 主库出问题了,从库怎么办
             *_ case:一主多从,主库A切换为A',其余从库如何将要同步到主库切换到A'
-            *[#lightblue] 基于GTID(Global Transaction ID)
+            *[#orange] 基于GTID(Global Transaction ID)
                 *_ server_uuid(实例启动时生成,全局唯一):gno(整数,从1开始,事务提交时分配并加一)
                 *_ gtid_mode=on和enforce_gtid_consistency=on
                 *_ 生成两种case:gtid_next=automatic(自动加一分配);set gtid_next='current_gtid'(gtid已经存在则ignore,若有则用设定值)
@@ -359,7 +373,7 @@ left side
                 *_ 执行start slave,从库把gtid set发给主库,主库判断是自己的子集与否.若是则同步从库没有的部分;若不是则报错
         *[#lightgreen] 读写分离有哪些坑
             *_ 两种架构:1client直连从库(少一层性能好,结构简单;变更会有client感知);2client连proxy(client友好;结构复杂)
-            *[#lightblue] 过期读
+            *[#orange] 过期读
                 *_ 走master
                 *_ sleep
                 * 判断主备延迟
@@ -368,20 +382,20 @@ left side
                     *_ 对比GTID set
                 * semi sync:有从库ack了再给client返回
         *[#lightgreen] 如何判断一个数据库是不是出问题了
-            *[#lightblue] select 1
+            *[#orange] select 1
                 *_ 优点:简单
                 *_ 缺点:只能判断出库的进程还在,不能判断主库没有问题
                 *_ 例如:innodb_thread_concurrency已经满了,但是select 1可以正常返回
                 *_ innodb_thread_concurrency默认为0表示不限制,推荐64-128
                 *_ 锁等待状态,并发计数减一
-            *[#lightblue] 自定义一个表health & select * from health
+            *[#orange] 自定义一个表health & select * from health
                 *_ 优点:能查出并发过多导致数据库不可用的情况
                 *_ 缺点:查不出binlog导致磁盘满了的情况,因为系统可以正常读
-            *[#lightblue] 自定义一个表health & update health set updateTime = now()
+            *[#orange] 自定义一个表health & update health set updateTime = now()
                 *_ 优点:能查出binlog占满磁盘的情况
                 *_ 缺点:主备同步时可能因为update导致行冲突
                 *_ 改进方法,多行数据,以server id为主键,每台机器更新自己的行
-            *[#lightblue] 内部统计
+            *[#orange] 内部统计
                 *_ 上面的方法可以判断状态,但是不好判断update慢\n 比如IO利用率100%的场景,检测语句仍有可能很快返回\n 因为检测语句资源占用不大,如果拿到资源就能很快返回
                 *_ performance_schema库file_summary_by_event_name表;开启慢10%
                 *_ 可以通过update setup_instruments set ENABLED='YES', Timed='YES'来控制开关
@@ -391,68 +405,68 @@ left side
             *_ innoDB会自动选择回滚成本更小的方案避免死锁
             *_ 间隙锁是由后继的记录定义的,所以删除记录可能导致锁范围扩大,空表锁住所有
         *[#lightgreen] 误删数据后怎么办
-            *[#lightblue] delete误删行
+            *[#orange] delete误删行
                 *_ 使用Flashback恢复,需要binlog_format=row和binlog_row_image=FULL
                 *_ 不建议直接在主库上操作,先在临时库上恢复,确认后再恢复到主库;防止数据二次破坏
                 *_ 预防:sql_safe_updates参数设置为on,无where或where没有索引字段,报错
                 *_ 预防:sql上线前评审
-            *[#lightblue] drop/truncate误删表&库
+            *[#orange] drop/truncate误删表&库
                 *_ 需要定期的全量备份和binlog备份
                 *_ 找到最近的全量备份,再用binlog备份复原
                 *_ 加速恢复:mysqlbinlog命令可以通过-database参数指定库
                 *_ 记得跳过误删语句
-                * 比较慢
+                *[#lightblue] 比较慢
                     *_ 因为误删表的话,最好只重放该表而不是库,但mysqlbinlog不能指定表
                     *_ mysqlbinglog单线程
-                * 加速方法
+                *[#lightblue] 加速方法
                     *_ 从备份恢复出临时实例,将该实例设置为线上备库的从库
                     *_ start slave之前,change replication filter replicate_do_table = (tbl_name)
                     *_ 这样可以并行
                     *_ 如果备库binlog不全,可以手动放入再重启,即可重新识别binlog文件
-                * 延迟恢复备库
+                *[#lightblue] 延迟恢复备库
                     *_ CHANGE MASTER TO MASTER_DELAY=N命令,可以指定这个备库持续保持跟主库有N秒的延迟
                     *_ 这样最多追N的时间即可恢复
                 *_ 预防:账号分离,常见开发账号只有DML权限没有DDL权限
                 *_ 预防:操作规范:如删除必须先改名,比如后面加to_be_deleted\n 一段时间无问题,才必须从管理系统删除\n 管理系统也只能删带有后缀的表or库
-            *[#lightblue] rm命令误删mysql实例
+            *[#orange] rm命令误删mysql实例
                 *_ 删掉节点:整个集群选个新主库
                 *_ 删掉集群:备份跨机房/跨城市
-            *[#lightblue] 预防
+            *[#orange] 预防
                 *_ 四个脚本:备份/执行/验证/回滚
                 *_ 用chatrr +i给重要文件加保护,这样root也没法直接删除
         *[#lightgreen] 为什么有kill不掉的语句
             *_ kill query+线程id;终止语句
             *_ kill connection+线程id;connection可以缺省,终止线程连接
-            *[#lightblue] kill后的操作
+            *[#orange] kill后的操作
                 *_ 1将线程状态改为kill_query
                 *_ 2给执行线程发一个信号
-            *[#lightblue] 为何kill了却还能在show processlist结果里看到
+            *[#orange] 为何kill了却还能在show processlist结果里看到
                 * 1线程执行中有一些判断逻辑,发现状态kill了,再进入终止逻辑
                     *_ 如IO压力大,IO函数一直没有返回,不能即使判断线程状态
                 *_ 2如果处于等待状态,必须是可以被唤醒的线程
-                * 3执行终止逻辑需要一个过程
+                *[#lightblue] 3执行终止逻辑需要一个过程
                     *_ 超大事务回滚
                     *_ 大查询回滚,清理临时文件
                     *_ DDL执行到最后阶段,被kill需要删除中间临时文件,可能受IO资源影响耗时久
-            *[#lightblue] client ctrl+c
+            *[#orange] client ctrl+c
                 *_ MySQL是停等协议,还没有返回的时候,不能继续下一个命令
                 *_ client另外启动一个连接,再执行kill query命令
-            *[#lightblue] client 库里表多就建立连接慢
-                * 客户端有命令表名补全功能
+            *[#orange] client 库里表多就建立连接慢
+                *[#lightblue] 客户端有命令表名补全功能
                     *_ show databases;
                     *_ show tables;
                     *_ 内存建立hashTable;所以表多会慢
                 *_ 用-A参数可以取消
-                * 用-quick参数
+                *[#lightblue] 用-quick参数
                     *_ 跳过表名补全功能
                     *_ mysql_use_result(本地不缓存)
                     *_ 不会把执行命令记录到本地历史文件
-            *[#lightblue] kill慢时
+            *[#orange] kill慢时
                 *_ 调大并发度,或者停掉别的线程,让出位子给这个线程执行
                 *_ 若受限于IO等资源执行慢,只能减少系统压力
                 *_ 若kill,导致事务回滚很慢,应该等吗?应该,因为不等,直接关闭,重启后,该有的操作一样会继续
         *[#lightgreen] 我查这么多数据,会不会把数据库内存打爆
-            *[#lightblue] 流程
+            *[#orange] 流程
                 *_ 获取一行,写到net_buffer中.大小是由参数net_buffer_length定义的,默认是16k
                 *_ 重复获取行,直到net_buffer写满,调用网络接口发出去
                 *_ 如果发送成功,就清空net_buffer,然后继续取下一行,并写入net_buffer
@@ -461,43 +475,43 @@ left side
             *_ InnoDB使用LRU算法更新BufferPool,内存命中率一般需要99%以上,innodb_buffer_pool_size推荐物理内存的60%-80%
             *_ 通过分代,防止大表扫描导致内存命中率下降
         *[#lightgreen] 到底可不可以用join
-            *[#lightblue] 流程
+            *[#orange] 流程
                 *_ 优化器选择小表作为驱动表, 如果用straight join则可以手动指定
                 *_ 小表指的是总数据量,因此有可能表A100行,1个字段;表B虽然50行,但是有3个字段,通算表A是小表
                 *_ 从驱动表1读出一行,去被驱动表2里找到相应数据
                 *_ 加入结果集,并重复上述过程
-            *[#lightblue] 如何从被驱动表找数据
+            *[#orange] 如何从被驱动表找数据
                 *_ 能用索引的话用索引(这种情况可以join)
-                * 不能能用索引的话(这种join尽量不用,可能导致内存命中率下降)
+                *[#lightblue] 不能能用索引的话(这种join尽量不用,可能导致内存命中率下降)
                     * 将驱动表数据全部放入内存
                         *_ 放不下的case,分段放
                         *_ join_buffer_size控制,默认256k
                     *_ 扫描被驱动表并与内存中数据join
         *[#lightgreen] join语句如何优化
-            *[#lightblue] Multi-Range Read(MRR)优化
+            *[#orange] Multi-Range Read(MRR)优化
                 *_ 根据索引a,定位到满足条件的记录,将id值放入read_rnd_buffer中;(read_rnd_buffer_size参数控制,满了则循环操作)
                 *_ 将read_rnd_buffer中的id进行递增排序;
                 *_ 排序后的id数组,依次到主键id索引中查记录,并作为结果返回.
-            *[#lightblue] Batched Key Access(BKA)优化
+            *[#orange] Batched Key Access(BKA)优化
                 *_ 驱动表数据放到join_buffer
                 *_ 用MRR方式从被驱动表找数据
-            *[#lightblue] 想用join,但被驱动表无索引,加索引又因为是低频业务不值得操作,怎么办
+            *[#orange] 想用join,但被驱动表无索引,加索引又因为是低频业务不值得操作,怎么办
                 *_ 将被驱动表对应数据查出,放在临时表
                 *_ 临时表加索引再join
-            *[#lightblue] hash_join
+            *[#orange] hash_join
                 *_ join操作只能轮询是慢的根源,能hash会快很多
                 *_ MySQL 8.0支持hash join了
                 *_ 更早的版本只能手动在程序里模拟
-            *[#lightblue] 三表join语句如何加索引
+            *[#orange] 三表join语句如何加索引
                 *_ select * from t1 join t2 on(t1.a=t2.a) join t3 on (t2.b=t3.b) where t1.c>=X and t2.c>=Y and t3.c>=Z;
                 *_ 在t1.c>=X、t2.c>=Y、t3.c>=Z这三个条件里,选择一个经过过滤以后,数据最少的那个表,作为第一个驱动表.此时,可能会出现如下两种情况
-                * 第一种情况,如果选出来是表t1或者t3,那剩下的部分就固定了
+                *[#lightblue] 第一种情况,如果选出来是表t1或者t3,那剩下的部分就固定了
                     *_ t1是驱动表,t1->t2->t3,此时在被驱动表上t2.a和t3.b建索引
                     *_ t3是驱动表,t3->t2->t1,此时在被驱动表上t2.b和t1.a建索引
                 *_ 如果选出来的第一个驱动表是表t2的话,由于t2既可以先join t1,又可以join t3,所以选更小的表驱动
         *[#lightgreen] 为什么临时表可以重名
-            *[#lightblue] 临时表的特性
-                * 临时表和内存表的不同
+            *[#orange] 临时表的特性
+                *[#lightblue] 临时表和内存表的不同
                     *_ 内存表create table ... engine=memory,数据在内存,重启被清空,但表结构还在
                     *_ 临时表可以用任何引擎,写数据时写盘,重启自动回收
                 *_ create temporary table ...
@@ -505,26 +519,26 @@ left side
                 *_ 可以和普通表重名
                 *_ sessionA同时有同名临时表和普通表时,show create以及增删改查访问的临时表
                 *_ show tables不显示临时表
-            *[#lightblue] 临时表应用
+            *[#orange] 临时表应用
                 *_ 跨库查询:各库查询结果放入临时表,再进行后续操作
                 *_ 复杂查询的优化:如join查询,被驱动表没有索引,可以将查到数据放入临时表,临时表加索引,再join
-            *[#lightblue] 临时表为什么可以重名
+            *[#orange] 临时表为什么可以重名
                 *_ 表定义文件,放在临时文件目录下,#sql{进程id}_{线程id}_序列号.frm
-                * 数据文件
+                *[#lightblue] 数据文件
                     *_ 5.6及之前,临时文件目录下,相同前缀的.ibd文件
                     *_ 5.7开始,有一个临时文件空间,专门存放临时文件的数据,不需要再创建idb文件(防止频繁使用临时表,创建/删除文件,带来大量磁盘性能消耗)
-                * table_def_key
+                *[#lightblue] table_def_key
                     *_ 普通表库名+表名
                     *_ 临时表在普通表基础上,加server_id+thread_id
-            *[#lightblue] 临时表和主备复制
+            *[#orange] 临时表和主备复制
                 *_ binlog format=row时,临时表语句不进入binlog
                 *_ binlog format=statement/mixed时,临时表操作语句才进入binlog
             *_ 临时表可以alter table改名,但不能直接rename
         *[#lightgreen] 什么时候使用内部临时表
-            *[#lightblue] union
+            *[#orange] union
                 *_ 内部临时表上面有唯一索引,实现去重语义
                 *_ 若union all,则无去重,则不用内部临时表
-            *[#lightblue] group by
+            *[#orange] group by
                 *_ 内部临时表上面有唯一索引,实现分组语义
                 *_ 返回默认排序,若无需排序,可以加order by null
                 *_ 若group by字段有索引,则无需内部临时表
@@ -544,41 +558,41 @@ left side
             *_ 因为重启数据丢失,担心主备不一致,重启后binlog记录delete from t1
             *_ 适用于用户临时表case
         *[#lightgreen] 自增主键为什么不是连续的
-            *[#lightblue] 自增值存在哪里
+            *[#orange] 自增值存在哪里
                 *_ MyISAM 在数据文件
                 *_ InnoDB在内存,若重启,设为current_max()+1;8.0版本后,持久化到redo-log
-            *[#lightblue] 自增值修改机制
+            *[#orange] 自增值修改机制
                 *_ 若为0/null/未制定,设定为自增值
                 *_ 否则设定为指定值
-                * 然后变更自增值;
+                *[#lightblue] 然后变更自增值
                     *_ if(指定值小于自增值) then do noting
                     *_ else 从auto_increment_offset(默认1)开始,以auto_increment_increment(默认1)为步长,持续叠加,直到找到第一个大于指定值的值,作为新的自增值
-            *[#lightblue] 不连续的原因
+            *[#orange] 不连续的原因
                 *_ 主键冲突
                 *_ 事务回滚:为什么自增值不能回退?因为可能有别的事务更新了自增值
                 *_ 批量插入(insert select)(不清楚申请多少,实际是类似java hashmap resize,二进制翻倍申请)
-            *[#lightblue] 自增锁的优化
-                * innodb_autoinc_lock_mode参数,版本5.1引入,默认1
+            *[#orange] 自增锁的优化
+                *[#lightblue] innodb_autoinc_lock_mode参数,版本5.1引入,默认1
                     *_ 0:和5.0一样,语句结束才释放锁
                     *_ 1:普通insert,申请后就释放;insert select,语句结束才释放(应用场景:主从复制,binlog是statement格式)
                     *_ 2:申请就释放
         *[#lightgreen] insert语句的锁为什么这么多
-            *[#lightblue] insert select在可重复读隔离级别+binlog是statement格式时,会对select表所有扫描到的记录和间隙加锁
+            *[#orange] insert select在可重复读隔离级别+binlog是statement格式时,会对select表所有扫描到的记录和间隙加锁
                 *_ 因为如果不加锁,主从复制场景,由于可重复读,主库看不到事务执行中新插入的记录
                 *_ 但是binlog同步到从库,statement格式,从库会插入事务执行中新插入的数据,导致数据不一致
-            *[#lightblue] insert t select t
+            *[#orange] insert t select t
                 *_ insert into t(c,d)  (select c+1, d from t force index(c) order by c desc limit 1)
                 *_ 上述语句会使用临时表&锁全表
                 *_ 原因是这类一边遍历数据,一边更新数据的情况,如果读出来的数据直接写回原表,就可能在遍历过程中,读到刚刚插入的记录,新插入的记录如果参与计算逻辑,就跟语义不符
                 *_ 可以用临时表优化\n create temporary table temp_t(c int,d int) engine=memory;\n insert into temp_t  (select c+1, d from t force index(c) order by c desc limit 1);\n insert into t select * from temp_t;\n drop table temp_t;
-            *[#lightblue] insert唯一键冲突
+            *[#orange] insert唯一键冲突
                 *_ 冲突后,会在冲突索引上加读锁(可能导致死锁)
                 *_ 这样可以防止该记录被别的事务删掉,维护可重复读的语义
-            *[#lightblue] insert on duplicate key update
+            *[#orange] insert on duplicate key update
                 *_ 冲突后,会在冲突索引上加next-key lock写锁
                 *_ 多个唯一键冲突,update和第一个索引冲突的行
         *[#lightgreen] 如何最快复制一张表
-            *[#lightblue] mysqldump
+            *[#orange] mysqldump
                 *_ mysqldump -h$host -P$port -u$user --add-locks=0 --no-create-info --single-transaction  --set-gtid-purged=OFF db1 t --where="a>900" --result-file=/client_tmp/t.sql
                 *_ –single-transaction的作用是,在导出数据的时候不需要对表db1.t加表锁,而是使用START TRANSACTION WITH CONSISTENT SNAPSHOT的方法
                 *_ –add-locks设置为0,表示在输出的文件结果里,不增加"LOCKTABLEStWRITE;"
@@ -587,8 +601,8 @@ left side
                 *_ –result-file指定了输出文件的路径,其中client表示生成的文件是在客户端机器上的
                 *_ 如果希望生成的文件中一条INSERT语句只插入一行数据的话,可以在执行mysqldump命令时,加上参数–skip-extended-insert
                 *_ 在db2库上执行:mysql -h127.0.0.1 -P13000  -uroot db2 -e "source /client_tmp/t.sql"
-            *[#lightblue] 导出csv
-                * select * from db1.t where a>900 into outfile '/server_tmp/t.csv';
+            *[#orange] 导出csv
+                *[#lightblue] select * from db1.t where a>900 into outfile '/server_tmp/t.csv';
                     *_ 文件保存在server端
                     *_ into outfile指定了文件的生成位置(/server_tmp/),这个位置必须受参数secure_file_priv的限制.参数secure_file_priv的可选值和作用分别是
                         *_ 如果设置为empty,表示不限制文件生成的位置,这是不安全的设置
@@ -600,39 +614,116 @@ left side
                     *_ mysqldump提供了一个–tab 参数,可以同时导出表结构定义文件和csv数据文件
                     *_ mysqldump -h$host -P$port -u$user ---single-transaction  --set-gtid-purged=OFF db1 t --where="a>900" --tab=$secure_file_priv
                     *_ $secure_file_priv定义的目录下,创建一个t.sql文件保存建表语句,同时创建一个t.txt文件保存CSV数据
-                * load data infile '/server_tmp/t.csv' into table db2.t;
+                *[#lightblue] load data infile '/server_tmp/t.csv' into table db2.t;
                     *_  若binlog为statement,则csv会写入binlog
                     *_  不加'local',是读取服务端的文件,这个文件必须在secure_file_priv指定的目录或子目录下
                     *_  加上'local',读取的是客户端的文件,只要mysql客户端有访问这个文件的权限即可.这时候,MySQL客户端会先把本地文件传给服务端,然后执行上述的load data流程.
-            *[#lightblue] 物理copy
+            *[#orange] 物理copy
                 *_  假设我们现在的目标是在db1库下,复制一个跟表t相同的表r
                 *_  执行create table r like t,创建一个相同表结构的空表
                 *_  执行alter table r discard tablespace,这时候r.ibd文件会被删除
                 *_  执行flush table t for export,这时候db1目录下会生成一个t.cfg文件(t只读)
                 *_  在db1目录下执行cp t.cfg r.cfg;cp t.ibd r.ibd;这两个命令(这里需要注意的是,拷贝得到的两个文件,MySQL进程要有读写权限);
                 *_  执行unlock tables,这时候t.cfg文件会被删除;(t释放读锁)
-                *  执行alter table r import tablespace,将这个r.ibd文件作为表r的新的表空间,由于这个文件的数据内容和t.ibd是相同的,所以表r中就有了和表t相同的数据
+                *[#lightblue]  执行alter table r import tablespace,将这个r.ibd文件作为表r的新的表空间,由于这个文件的数据内容和t.ibd是相同的,所以表r中就有了和表t相同的数据
                     *_  在执行import tablespace的时候,为了让文件里的表空间id和数据字典中的一致,会修改r.ibd的表空间id.而这个表空间id存在于每一个数据页中.
                     *_  因此,如果是一个很大的文件(比如TB级别),每个数据页都需要修改,所以你会看到这个import语句的执行是需要一些时间的.
                     *_  当然,如果是相比于逻辑导入的方法,import语句的耗时是非常短的
-            *[#lightblue] 对比
-                * 物理拷贝
+            *[#orange] 对比
+                *[#lightblue] 物理拷贝
                     *_ 速度最快,尤其对大表拷贝.误删表的情况,用备份恢复出误删之前的临时库,然后再把临时库中的表拷贝到生产库上,是恢复数据最快的方法
                     *_ 但是,这种方法的使用也有一定的局限性:必须是全表拷贝,不能只拷贝部分数据;
                     *_ 需要到服务器上拷贝数据,在用户无法登录数据库主机的场景下无法使用;
                     *_ 由于是通过拷贝物理文件实现的,源表和目标表都是使用InnoDB引擎时才能使用.
-                * 用mysqldump生成包含INSERT语句文件的方法
+                *[#lightblue] 用mysqldump生成包含INSERT语句文件的方法
                     *_ 可以在where参数增加过滤条件,来实现只导出部分数据
                     *_ 这个方式的不足之一是,不能使用join这种比较复杂的where条件写法.
-                * 用select…into outfile
+                *[#lightblue] 用select…into outfile
                     *_ 最灵活的,支持所有的SQL写法.
                     *_ 但缺点之一就是,每次只能导出一张表的数据,而且表结构也需要另外的语句单独备份
         *[#lightgreen] grant之后要跟着flush privileges吗
+            *[#orange] create user
+                *_ create user 'ua'@'%' identified by 'pa'
+                *_ 创建一个用户’ua’@’%’,密码是 pa.
+                *_ 注意,用户名 (user)+地址 (host)才表示一个用户,因此ua@ip1和ua@ip2代表的是两个不同的用户
+                *_ 磁盘上,往mysql.user表里插入一行,由于没有指定权限,所以这行数据上所有表示权限的字段的值都是N;
+                *_ 内存里,往数组acl_users里插入一个acl_user对象,这个对象的access字段值为0
+            *[#orange] 全局权限
+                *_ grant all privileges on *.* to 'ua'@'%' with grant option;
+                *_ 磁盘上,将mysql.user表里,用户’ua’@’%'这一行的所有表示权限的字段的值都修改为‘Y’;
+                *_ 内存里,从数组acl_users中找到这个用户对应的对象,将access值(权限位)修改为二进制的"全1"
+                *_ 如果有新的客户端使用用户名ua登录成功,会为新连接维护一个线程对象,然后从acl_users数组里查到这个用户的权限,并将权限值拷贝到这个线程对象中.
+                *_ 之后在这个连接中执行的语句,所有关于全局权限的判断,都直接使用线程对象内部保存的权限位
+                *_ revoke逻辑类似:revoke all privileges on *.* from 'ua'@'%';
+            *[#orange] db权限
+                *_ grant all privileges on db1.* to 'ua'@'%' with grant option;
+                *_ 磁盘上,往mysql.db表中插入了一行记录,所有权限位字段设置为"Y";
+                *_ 内存里,增加一个对象到数组acl_dbs中,这个对象的权限位为"全 1"
+                *_ 每次需要判断一个用户对一个数据库读写权限的时候,都需要遍历一次acl_dbs数组,根据user、host和db找到匹配的对象,然后根据对象的权限位来判断
+                *_ 如果当前会话已经处于某一个db里面,之前use这个库的时候拿到的库权限会保存在会话变量中
+            *[#orange] 表权限和列权限
+                *_ 表权限定义存放在表mysql.tables_priv中,列权限定义存放在表mysql.columns_priv中
+                *_ 这两类权限,组合起来存放在内存的hash结构column_priv_hash中
+                *_ create table db1.t1(id int, a int);\n grant all privileges on db1.t1 to 'ua'@'%' with grant option;\n GRANT SELECT(id), INSERT (id,a) ON mydb.mytbl TO 'ua'@'%' with grant option;
+            *[#orange] flush privileges
+                *_ 清空acl_users数组,然后从mysql.user表中读取数据重新加载
+                *_ 应用case:当数据表中的权限数据跟内存中的权限数据不一致的时候
+                *_ 这种不一致往往是由不规范的操作导致的,比如直接用DML语句操作系统权限表
         *[#lightgreen] 要不要使用分区表
             *_ 引擎层是N个表,server层是1个表
             *_ 分区表gap-lock是在引擎层单表上
             *_ 每当第一次访问分区表时,会依次打开所有分区
             *_ MDL锁会锁住所有的分区
         *[#lightgreen] 答疑三:说一说这些好问题
+            *[#orange] join写法
+                *[#lightblue] left join左边表一定是驱动表吗?
+                    *_ 不一定,如果where里有判断,可能退化为join,此时优化器可能选择右边表作为驱动表
+                    *_ 所以如果要实现left join语义,where里不能有被驱动表字段的等值/不等值判断,必须写在on里
+                *[#lightblue] join有多个等值判断,写on还是where
+                    *_ 优化器全部优化为where,完全一样
+                *_ NULL跟任何值执行等值判断和不等值判断的结果,都是NULL;select NULL=NULL的结果,也是返回NULL
+            *[#orange] simple nested-loop join性能
+                *[#lightblue]  block nested-loop join
+                    *_ 首先,将驱动表的数据全部读入内存join_buffer中,这里join_buffer是无序数组;
+                    *_ 然后,顺序遍历被驱动表的所有行,每一行数据都跟join_buffer中的数据进行匹配,匹配成功则作为结果集的一部分返回
+                *[#lightblue]  simple nested-loop join
+                    *_ 顺序取出驱动表中的每一行数据,到被驱动表去做全表扫描匹配,匹配成功则作为结果集的一部分返回
+                *[#lightblue] 为什么性能不如block nested-loop join
+                    *_ 在对被驱动表做全表扫描的时候,如果数据没有在Buffer Pool中,就需要等待这部分数据从磁盘读入
+                    *_ 从磁盘读入数据到内存中,会影响正常业务的Buffer Pool命中率,而且这个算法天然会对被驱动表的数据做多次访问,更容易将这些数据页放到Buffer Pool的头部
+                    *_ 即使被驱动表数据都在内存中,每次查找"下一个记录的操作",都是类似指针操作.而join_buffer中是数组,遍历的成本更低
+            *[#orange] group by和distinct性能
+                *_ 标准的group by语句,是需要在select部分加一个聚合函数
+                *_ 所以不需要执行聚合函数时,distinct和group by的语义和执行流程是相同的
+            *[#orange] 备库自增主键
+                *_ 在binlog_format=statement时,自增主键可能会主备不一致吗?
+                *_ 在insert 语句之前,还有一句SET INSERT_ID=1,所以不会出现主备不一致
         *[#lightgreen] 自增id用完怎么办
+            *[#orange] 自增主键
+                *_ int unsigned4个字节2^32-1,超过报唯一键冲突
+                *_ bigint unsigned 8个字节
+            *[#orange] innodb row_id
+                *_ 若没有设置主键,6个字节,全局使用(所有没有主键的表共用)
+                *_ 超过为0,然后继续循环,会覆盖update原来的行
+            *[#orange] XID(server层维护,redo-log和binlog同步字段)
+                *_ global_query_id是一个纯内存变量,重启之后就清零了.
+                *_ 在同一个数据库实例中,不同事务的Xid也是有可能相同的.
+                *_ 但是MySQL重启之后会重新生成新的binlog文件,因此,同一个binlog文件里,Xid一定是惟一的.
+                *_ 8个字节,超过回0,很大所以只有理论可能超过
+            *[#orange] innodb trx_id(引擎层维护)
+                *_ 全局变量,每次加一
+                *[#lightblue] 而对于只读事务,InnoDB并不会分配trx_id
+                    *_ 减小事务视图里面活跃事务数组的大小
+                    *_ 可以减少trx_id的申请次数
+                    *_ 如果在select语句后面加上for update,这个事务也不是只读事务
+                *_ update和delete语句除了事务本身,还涉及到标记删除旧数据,也就是要把数据放到purge队列里等待后续物理删除,这个操作也会把max_trx_id+1,因此在一个事务中至少加2;
+                *_ InnoDB的后台操作,比如表的索引信息统计这类操作,也是会启动内部事务的,因此你可能看到,trx_id值并不是按照加1递增的
+                *[#lightblue] 只读未写时,把当前事务的trx变量的指针地址转成整数,再加上2^48.使用这个算法,就可以保证以下两点:
+                    *_ 不同事务xid不一致
+                    *_ 相同事务xid一致
+                    *_ 在显示值里面加上2^48,目的是要保证只读事务显示的trx_id值比较大,正常情况下就会区别于读写事务的id
+                *_ 持久化存储
+                *_ 6个字节,超过回0,会持续脏读
+            *[#orange] thread_id
+                *_ 4个字节,超过回0,不会重复,因为会和当前活跃id比较,若重复+1继续判断
 @endmindmap
