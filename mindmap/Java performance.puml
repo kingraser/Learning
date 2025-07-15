@@ -175,6 +175,42 @@
             *_ 单例:枚举实现/内部类实现
             *_ 生产者/消费者模式大流量下延迟高:1提高响应速度2限流拒绝
     *[#pink] 实战演练
+        *[#lightblue] 分布式锁
+            *_ db
+            *[#lightgreen] zookeeper
+                * feature
+                    *_ 节点:持久/临时;还能被标记有序性
+                    *_ watch机制:特定事件触发,会通知watcher
+                *_ 父节点(持久)下建立子节点,并标记有序性
+                *_ 轮询判断,如果是最小节点则获得锁,操作完毕删除节点
+                *_ 否则对上一个节点注册watcher
+                * 优缺点
+                    *_ 集群实现,避免单点
+                    *_ 每次都能释放锁,因为服务挂了临时节点会因为连接断开而自动删除
+                    *_ 性能比redis差
+            *[#lightgreen] redis
+                *_ SETNX+EXPIRE
+                * 优缺点
+                    *_ 性能好
+                    *_ 集群模式,由于同步到各个节点是异步的,若master崩溃,新master上没有被同步到,则锁失效
+                * redlock算法
+                    *_ 集群模式下,超过一半节点成功&耗时小于lock_timeout则获得锁成功
+        *[#lightblue] 分布式事务 TODO
+            * XA规范
+                *_ DTP模型:AP/RM/TM
+                *_ 父节点(持久)下建立子节点,并标记有序性
+            * 二/三阶段提交
+                *_ prepare commit
+                *_ 准备/预处理/提交或者回滚
+            * TCC
+                *_ try/confirm/cancel
+                *_ 重试调用失败的confirm or cancel方法
+            * Seata
+                *_ TC/TM/RM
+                *_ DTP模型:AP/RM/TM
+                *_ DTP模型:AP/RM/TM
+        *[#lightblue] 缓存
+        *[#lightblue] 抢购
 left side
     *[#pink] 3Java编程性能调优
         *[#lightblue] String优化
@@ -306,8 +342,34 @@ left side
                 *_ 优化select count(*) 超级大表可用近似值/或另行加入统计表
                 *_ 优化select * 应该尽量缩减字段用上索引
         *[#lightblue] 高并发事务调优
+            *[#lightgreen] 并发事务带来的问题
+                *_ 数据丢失
+                *_ 脏读
+                *_ 不可重复读
+                *_ 幻读
+            *[#lightgreen] 隔离级别
+                *_ read uncommitted 脏读/不可重复读/幻读
+                *_ read committed 不可重复读/幻读
+                *_ repeatable read 幻读
+                *_ serializable
+            *[#lightgreen] 优化
+                *_ 结合业务场景降低隔离级别
+                *_ 避免行锁升级为表锁(行锁基于索引,无索引会导致表锁)
+                *_ 控制事务大小,减少锁定资源量和锁定时长
         *[#lightblue] 索引失效/优化
+            *_ 覆盖索引优化查询
+            *_ 自增主键优化插入/查询
+            *_ 前缀索引优化(缩减索引大小,但order by无法使用前缀索引)
+            *[#lightgreen] 防止索引失效
+                *_ 比如%开头的查询,最左匹配原则
+                *_ or有一个条件没有索引,则涉及的索引都不会被用到
         *[#lightblue] 如何避免死锁
+            *[#lightgreen] 避免死锁的措施
+                *_ 编程中按照固定顺序处理记录
+                *_ 允许幻读和不可重复读的情况下,使用RC作为隔离级别,避免gap lock导致的死锁
+                *_ 更新表尽量使用主键更新
+                *_ 避免长事务
+                *_ 设置锁等待超时参数
         *[#lightblue] 何时分库分表
             *_ 单表查询性能受B+数树高影响
             *[#lightgreen] 优化
@@ -370,7 +432,52 @@ left side
                 *_ 避免复杂join操作
             *_ 为什么不用外键:update数据要求顺序/手工更新麻烦/外键约束检查影响性能
         *[#lightblue] 库参数设置优化
+            *[#lightgreen] query cache(5.7.20后默认关闭,8版本后完全取消)
+                *_ have_query_cache 是否支持
+                *_ query_cache_limit 默认1M,超过不会cache
+                *_ query_cache_min_res_unit 最小内存大小,默认4k
+                *_ query_cache_size cache大小
+                *_ query_cache_type ON/OFF/DEMAND(query里使用SQL_CACHE/SQL_NO_CACHE来控制是否cache)
+            *[#lightgreen] MyISAM
+                * key_buffer_size 缓存索引块
+                    * 太大也不好,占用过多内存,容易发生SWAP页交换
+                        *_ SWAP分区在系统物理内存不够时,把内存中的一部分释放给当前程序使用
+                        *_ 被释放空间来自长时间没有操作的程序,数据临时保存在SWAP分区
+                        *_ 等程序要运行时,再从swap分区恢复保存的数据到内存中
+                    *_ 计算缓存使用率公式,来判断设置是否合理
+                    *_ 1-((key_blocks_unused*key_cache_block_size)/key_buffer_size)
+            *[#lightgreen] InnoDB
+                *_ innodb_buffer_pool_size 默认128M/推荐物理内存80%大小;命中率应该90%
+                *_ innodb_buffer_pool_instances 建议大小不超过innodb_read_io_threads+innodb_write_io_threads之和
+                * innodb_read_io_threads/innodb_write_io_threads
+                    *_ 默认4,合计8
+                    *_ 建议(innodb_read_io_threads+innodb_write_io_threads)=innodb_buffer_pool_instances
+                    * 可以通过以下查询确定读写比例
+                        *_ SHOW GLOBAL STATUS LIKE 'Com_select';//读取数量
+                        *_ SHOW GLOBAL STATUS WHERE Variable_name IN ('Com_insert', 'Com_update', 'Com_replace', 'Com_delete');//写入数量
+                *_ innodb_log_file_size redo-log大小,1GB左右,太大flush耗时长,恢复时间也长
+                *_ innodb_log_buffer_size 默认8M
+                *_ innodb_flush_log_at_trx_commit 落盘策略:0只写redo-log buffer;1事务每次提交;2只写page cache
+            *_ max_connections 最大连接数,默认151
+            *_ back_log tcp 连接请求排队等待栈,并发较大可以适当调大
+            *_ thread_cache_size 线程池大小
         *[#lightblue] InnoDB
+            *_ 内存
+            *[#lightgreen] 后台线程
+                *_ master cache数据刷盘,插入缓存,undo页回收
+                *_ IO
+                *_ purge 回收已经提交事务的undo log
+                *_ pager cleaner 协助master刷新脏页
+            *[#lightgreen] 存储文件
+                * tablespace
+                    *_ 默认为共享表空间,存储的文件即为共享表空间文件(ibdata1)
+                    *_ 若参数innodb_file_per_table为1,则会将存储的数据、索引等信息单独存储在一个独占表空间文件(ibd)
+                *_ segment 数据段/索引段/回滚段
+                *_ extent 1M,每次一般申请4-5个
+                *_ page 默认16K
+                *_ row 最多单页16k/2-200=7992
+            *_ redo-log工作原理 见MySQL的mindMap
+            *_ lru淘汰策略 见MySQL的mindMap
     *[#pink] 加餐
         *[#lightblue] 推荐常用性能测试工具
             *_ ab(apache bench)
