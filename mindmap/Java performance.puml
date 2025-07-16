@@ -73,17 +73,17 @@
                     *_ CPU/内存/IO有异常\n查命令&查日志
                     *_ JVM有异常\n查GC日志&查内存快照
                 *[#lightgrey] 系统无异常的情况
-                    *[#lightyellow] 优化code
-                    *[#lightyellow] 优化设计\neg:单例模式
-                    *[#lightyellow] 优化算法
-                    *[#lightyellow] 时间换空间
-                    *[#lightyellow] 空间换时间
-                    *[#lightyellow] 参数调优\neg:JVM参数设置
+                    *_ 优化code
+                    *_ 优化设计\neg:单例模式
+                    *_ 优化算法
+                    *_ 时间换空间
+                    *_ 空间换时间
+                    *_ 参数调优\neg:JVM参数设置
             *[#lightgreen] 兜底策略
                 *_ 限流
                 *_ 智能横向扩容
                 *_ 提前扩容
-    *[#pink] 多线程性能调优
+    *[#pink] 4多线程性能调优
         *[#lightblue] synchronized优化
             *_ 字节码monitorenter/monitorexit来持有/释放monitor对象
             *_ monitor可以和对象一起创建/销毁,由c++ObjectMonitor实现
@@ -128,9 +128,9 @@
             *_ go是N:M
             *_ Java21协程
             *_ 适合IO密集型
-        *[#lightblue] 强弱一致性
+        *[#lightblue] 强弱一致性TODO
             *_ Happens-Before原则
-    *[#pink] 设计模式调优
+    *[#pink] 6设计模式调优
         *[#lightblue] 单例
             *_ 保证全局一个实例&只有一个全局访问点
             *[#lightgreen] 饿汉模式
@@ -162,11 +162,11 @@
             *[#lightgreen] worker-thread模式
                 *_ 减少线程的创建/销毁开销
         *[#lightblue] 生产者/消费者模式
-            * 常见实现
+            *[#lightgreen] 常见实现
                 *_ Object wait/notify/notifyAll
                 *_ Lock的Condition的await/signal/signalAll
                 *_ BlockingQueue
-            * 电商库存设计
+            *[#lightgreen] 电商库存设计
                 *_ 缓存库容
                 *_ 消息队列
         *[#lightblue] 装饰器模式
@@ -174,7 +174,7 @@
         *[#lightblue] 答疑
             *_ 单例:枚举实现/内部类实现
             *_ 生产者/消费者模式大流量下延迟高:1提高响应速度2限流拒绝
-    *[#pink] 实战演练
+    *[#pink] 8实战演练
         *[#lightblue] 分布式锁
             *_ db
             *[#lightgreen] zookeeper
@@ -211,6 +211,7 @@
                 *_ DTP模型:AP/RM/TM
         *[#lightblue] 缓存
         *[#lightblue] 抢购
+    *[#pink] 9结束语
 left side
     *[#pink] 3Java编程性能调优
         *[#lightblue] String优化
@@ -219,12 +220,12 @@ left side
                 *_ 循环中使用StringBuilder/StringBuffer(线程安全)
             *[#lightgreen] String.intern节省空间
                 *_ twitter地址信息
-            *[#lightgreen] 慎用split方法\n可能导致回溯使CPU占用极高
+            *_ 慎用split方法\n可能导致回溯使CPU占用极高
         *[#lightblue] 慎重使用regular expression
-            *_ 模式:贪婪/懒惰?/独占+
+            *_ 模式:贪婪/懒惰?/独占+(同贪婪,但匹配失败不回溯,直接报失败)
             *[#lightgrey] 优化
                 *_ 少用贪婪，多用独占
-                *_ 减少分支选择
+                *_ 减少分支选择(比如让常用选项在前面,提取公共前缀)
                 *_ 减少嵌套捕获,加prefix ?:
         *[#lightblue] List
             *_ always use ArrayList\n better initialize size
@@ -239,14 +240,81 @@ left side
             *[#lightgrey] 扩容
                 *_ e.hash&oldCapacity结果0与其他分流;0在原位,其他在原Index+oldCapacity上
         *[#lightblue] IO模型
-            *_ NIO:减少内存复制/利用多路复用,防止阻塞
+            *[#lightgreen] 传统IO问题
+                *_ 多次内存复制
+                *_ 阻塞
+            *[#lightgreen] 优化
+                *_ 使用Buffer优化读写流操作(基于block)
+                *_ 使用DirectBuffer(非JVM物理内存)减少用户空间内存复制
+                *_ MappedByteBuffer是通过本地类调用mmap进行文件内存映射的\nmap()系统调用方法会直接将文件从硬盘拷贝到用户空间
+                *_ 避免阻塞:Channel/Selector
         *[#lightblue] 序列化
             *_ 避免使用java序列化:1无法跨语言;2不安全;3体积大;4性能不好
             *_ ProtoBuf:使用T(类型)L(长度)V(字段值)
+            *[#lightgreen] 序列化会反射调用无参构造器,破坏单例模式
+                *_ override readResolve方法,返回静态对象
+                *_ 通过内部类实现,只在被访问的时候加载一次
         *[#lightblue] RPC通信协议
-            *_ 避免使用java序列化:1无法跨语言;2不安全;3体积大;4性能不好
-            *_ ProtoBuf:使用T(类型)L(长度)V(字段值)
-    *[#pink] JVM性能监测及调优
+            *[#lightgreen] RMI(Remote Method Invocation)
+                *_ java序列化
+                *_ tcp短连接
+                *_ 阻塞式IO
+            *[#lightgreen] 高并发下RPC优化
+                *_ 选择适合的通讯协议
+                *_ 使用单一长连接
+                *_ 优化socket通信
+                *_ 量身定做报文格式
+                *_ 编码/解码(如Protobuf/Json/Hessian)
+                *_ 调整Linux的TCP参数设置选项
+        *[#lightblue] 深入了解NIO的优化实现原理
+            *[#lightgreen] IO模型
+                *[#lightyellow] 阻塞
+                    *_ connect阻塞 client端发起tcp连接请求
+                    *_ accept阻塞 server端接收外来连接
+                    *_ read/write阻塞 调用read()会阻塞线程
+                *[#lightyellow] 非阻塞
+                    *_ 使用fcntl可以把上述三个操作设置为非阻塞
+                    *_ 没数据返回EWOULDBLOCK或EAGAIN错误,不会阻塞
+                    *_ 调用read()会返回数据就绪/未就绪
+                *[#lightyellow] 复用
+                    *_ selector阻塞,channel非阻塞,用一个selector换多个channel
+                    *_ select/poll/epoll,判断就绪与否在内核态,比起用户态的轮询判断,有性能优势
+                    * select
+                        *_ 调用select()会阻塞,直到返回或超时
+                        * 劣势
+                            *_ 1:bitmap默认大小1024,虽然可以调整,但是仍然有上限
+                            *_ 2:rset(读文件描述符集合)被置位,不可重用,每次需要初始化
+                            *_ 3:rset需要用户态copy到内核态,有开销
+                            *_ 4:数组结构,需要O(n)再次遍历
+                    * poll
+                        *_ 类似select,但无劣势1&2
+                    * epoll
+                        *_ 无用户空间/内核空间copy fd
+                        *_ 只返回就绪事件
+                        *_ 使用红黑树而非数组,插入/删除有性能优势
+                        *_ 比起poll,无劣势3&4
+                *[#lightyellow] 信号驱动
+                    *_ 用户进程发起一个IO请求,调用sigaction函数,给socket注册一个回调
+                    *_ 内核数据就绪时,为该进程生成sigio信号
+                    *_ 对tcp,信号驱动没有使用,因为tcp socket信号事件有7种,应用程序收到也无法区分
+                    *_ udp只有一种数据请求事件,可以使用,NTP服务器就应用了该模型
+                *[#lightyellow] 异步
+                    *_ 信号驱动在等待数据就绪时没有阻塞,但在被通知后的IO操作是阻塞的
+                    *_ aio_read会告知内核启动某个操作,内核完成操作后同志进程,操作包括等待数据就绪和数据从内核copy到用户空间
+                    *_ linux不支持,windows支持,由于server大多是linux,所以主流中间件都不支持
+            *[#lightgreen] 零copy
+                *_ io device->内核空间->用户空间->内核空间->其他io设备
+                *_ Linux内核中的mmap函数可以代替read、write的I/O读写操作,实现用户空间和内核空间共享一个缓存数据
+            *[#lightgreen] 线程模型
+                *_ 单线程reactor 所有操作都在一个nio线程上完成
+                *_ 多线程reactor 一个线程监听连接请求事件,多个线程负责处理
+                *_ 主从reactor 监听也是多线程
+            *[#lightgreen] Tomcat参数
+                *_ acceptorThreadCount 监听线程数,默认1
+                *_ maxThreads 处理IO线程数,默认200
+                *_ acceptCount 监听队列大小
+                *_ maxConnections socket数,默认10000
+    *[#pink] 5JVM性能监测及调优
         *[#lightblue] 内存模型
             *[#lightgreen] heap
                 *_ 老年代 Tenured
@@ -321,7 +389,7 @@ left side
             *_ 可以通过JVM参数配置:如新生代大小,Eden比例
         *[#lightblue] 内存持续上升,如何排查
         *[#lightblue] 内存模型
-    *[#pink] 数据库性能调优
+    *[#pink] 7数据库性能调优
         *[#lightblue] 如何写高性能SQL
             *[#lightgreen] 慢SQL
                 *_ 无索引/索引失效
@@ -480,8 +548,15 @@ left side
             *_ lru淘汰策略 见MySQL的mindMap
     *[#pink] 加餐
         *[#lightblue] 推荐常用性能测试工具
-            *_ ab(apache bench)
-            *_ Jmeter
+            *[#lightgreen] ab(apache bench)
+                *_ 适合单个接口测试
+                *_ 简单实用
+                *_ 扩展性较低,缺乏对整个业务流程测试的支持
+            *[#lightgreen] Jmeter
+                *_ 功能全,可扩展性高,易学易操作
+                *_ 性能不稳定,高并发下通过页面实时观测结果集,容易导致页面卡死或崩溃
             *_ LoadRunner(商业版)
+                *_ 基本包括Jmeter常用功能,支持ip欺骗
+                *_ 专业稳定高效;但非开源且售价高
             *_ 阿里云PTS
 @endmindmap
