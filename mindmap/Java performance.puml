@@ -118,7 +118,14 @@
                 *_ 合理设置线程大小
                 *_ 确认安全的情况使用notify而非notifyAll
         *[#lightblue] 并发容器
-            *_ 用ConcurrentSkipListMap处理大数据(千万级)
+            *[#lightgreen] Map
+                *_ HashTable 强一致场景
+                *_ ConcurrentHashMap 1.7segment锁,1.8synchronized锁Entry实现;大部分场景都是弱一致情况下
+                * 用ConcurrentSkipListMap处理大数据(千万级),存在大量删改操作
+                    *_ 跳表 空间换时间
+            *[#lightgreen] List
+                *_ Vector 基于synchronized同步锁实现
+                *_ CopyOnWriteArrayList 读无锁,写通过操作底层Array新副本实现
         *[#lightblue] 线程池大小
             *_ cpu密集型 CPU核数+1
             *_ IO密集型 CPU核数*(线程等待时间/线程运行时间+1);可以用VisualVM查看比例
@@ -128,8 +135,8 @@
             *_ go是N:M
             *_ Java21协程
             *_ 适合IO密集型
-        *[#lightblue] 强弱一致性TODO
-            *_ Happens-Before原则
+        *[#lightblue] 强弱一致性
+            *_ Happens-Before原则 更多详见 java并发编程的mindMap
     *[#pink] 6设计模式调优
         *[#lightblue] 单例
             *_ 保证全局一个实例&只有一个全局访问点
@@ -195,7 +202,7 @@
                     *_ 集群模式,由于同步到各个节点是异步的,若master崩溃,新master上没有被同步到,则锁失效
                 * redlock算法
                     *_ 集群模式下,超过一半节点成功&耗时小于lock_timeout则获得锁成功
-        *[#lightblue] 分布式事务 TODO
+        *[#lightblue] 分布式事务
             * XA规范
                 *_ DTP模型:AP/RM/TM
                 *_ 父节点(持久)下建立子节点,并标记有序性
@@ -374,7 +381,9 @@ left side
                 *_ 工具分析相关log
             *[#lightgreen] 调优策略
                 * 降低MinorGC
-                    *_ 可以扩大Eden大小;但可能增加GC时间,实际要看新对象的存活周期
+                    *_ 可以扩大Eden大小
+                    *_ GC时间=扫描新生代(T1)+复制存活对象(T2);复制成本高于扫描成本
+                    *_ 通常MinorGC的时间取决于GC后存活对象的数量,而不是Eden区大小
                 * 降低FullGC
                     *_ 尽量避免大对象
                     *_ 增大内存
@@ -384,11 +393,129 @@ left side
                     *_ Parallel Scavenge:复制
                     *_ CMS:标记清理
                     *_ G1:标记整理+复制
-        *[#lightblue] 内存分配
-            *_ 用jmap查看队内存分布
+        *[#lightblue] 优化内存分配
+            *_ AB压测,查看指标
+                *_ GC频率
+                *_ 内存
+                *_ 吞吐量
+                *_ GC耗时
+            * 分析GC日志
+            *_ 用jmap查看堆内存分布
             *_ 可以通过JVM参数配置:如新生代大小,Eden比例
         *[#lightblue] 内存持续上升,如何排查
-        *[#lightblue] 内存模型
+            *[#lightgreen] linux命令行
+                *_ top
+                *_ vmstat
+                *_ pidstat
+            *[#lightgreen] JDK工具
+                *_ jstack 查看线程堆栈(常用来排查死锁)
+                *_ jmap
+                *_ jstat
+            *[#lightgreen] 内存泄漏排查流程
+                *_ 通过HeapDumpOnOutOfMemoryError和HeapDumpPath这两个参数开启堆内存异常日志
+                *_ 通过日志定位OOM,通过top查看(进程/线程)的内存使用情况
+                *_ jstack pid查看堆栈信息
+                *_ jmap 查看堆内存 发现老年代满了,且不释放
+                *_ jmap dump
+                *_ 用分析工具,按占用空间排序
+                *_ with incomming reference 查看引用对象
+        *[#lightblue] 热点问题
+            *[#lightgreen] CMS(已经被弃用)
+                * init mark
+                    *_ stw
+                    *_ 触发young GC,并后续利用young GC的Card Table结果
+                    *_ 找到老年代指向年轻代的引用,这些引用的card标记dirty
+                    *_ 时间短,因为只扫描可直达活对象(实际是可直达老年代+年轻代存活对象,因为年轻代存活对象也是GC root)
+                * concurrent mark
+                    *_ GC线程和应用线程同时
+                    *_ 遍历老年代,找出所有可达活对象
+                    *_ 由于并行,程序可能在修改对象引用
+                    *_ 若已标记存活变成垃圾,没问题,下次清理
+                    *_ 若新的存活对象没有被标记可达,大问题,在下次stw阶段解决
+                    *_ 用card table记录引用更新,为下两个阶段提供信息
+                * concurrent preclean:
+                    *_ 重扫card table标记为dirty的,找出新产生的,可能被遗漏的存活对象
+                    *_ 目标减少下次stw时间,可能会多次执行
+                *[#lightyellow] concurrent abortable preclean
+                    * 重点在可中断,在下面情况中断
+                        *_ 执行时间达到阈值
+                        *_ dirty card工作量降到某阈值以下
+                        * 等到了一次youngGC
+                            *_ youngGC stw,减少dirty card数量
+                            *_ youngGC 清理了年轻代,减少final remark的工作量
+                    *_ 不是强制的,比如上一个阶段脏卡片已经处理完,或者系统认为没必要,可能会被跳过活很快结束.
+                * final remark
+                    *_ stw,且比init mark长很多
+                * concurrent sweep
+                    *_ 清理对象,回收空间
+                    *_ 不移动活对象,有内存碎片问题
+                * concurrent reset
+                    *_ 恢复GC各种状态和数据结构
+                    *_ 为下一次周期做准备
+            *[#lightgreen] G1
+                *_ Eden/Survivor/Old/Humongous(大对象,一旦不可达,在youngGC回收)
+                *[#lightyellow] 停顿预测模型
+                    *_ 用户设定期望停顿时间,默认200ms.
+                    *_ 根据统计历史数据,预测一次回收的region数量
+                    *_ 通过控制region数量达到控制停顿时间的目标
+                *[#lightyellow] youngGC 完全stw
+                    *_ 触发条件 Eden满了
+                    * 流程
+                        *_ Root Scanning
+                        *_ Update Rset(RememberedSet) 处理老年代指向新生代的引用,避免全堆扫描
+                        *_ Evacuation 存活迁至survivor,年龄达标迁至old
+                        *_ 清理阶段 回收内存+处理软引用/弱引用/虚引用
+                    * Rset
+                        *_ 以region为单位,记录其他region引用本region对象的情况
+                        *_ 定位跨代引用,避免全堆扫描
+                        *_ 支持分区回收
+                        *_ 并发标记只需扫描Rset的dirty card并非全堆
+                        * 写屏障逻辑
+                            *_ 当执行obj.field=target时
+                            *_ if(target位于年轻代&&obj位于老年代)
+                            *_ then car_index=address_to_card_index(obj); //计算obj所在卡片
+                            *_ dirty_card(card_index);//标记卡片为脏
+                        * 并发优化逻辑
+                            *_ Refinement线程:异步处理脏卡片,更新对应RSet(通过-XX:G1ConcRefinementThreads控制线程数)
+                            *_ 缓冲区机制:写屏障将脏卡片存入线程本地缓冲区,满后推送至全局队列,由Refinement线程消费
+                *[#lightyellow] mixed GC
+                    *_ 触发条件 老年区占用达到阈值,默认45%
+                    * 流程
+                        * concurrent marking
+                            *_ initial mark stw 标记GC Roots直接引用(借道youngGC)
+                            *_ Root Region Scanning 扫描survivor区到老年代的对象
+                            *_ Concurrent Marking 遍历标记存活
+                            *_ final remark stw完成剩余标记(处理SATB缓冲区)
+                            *_ cleanup 统计分区垃圾比例,为mixed GC排序
+                        * Evacuation stw 复制,优先回收垃圾占比高的老年区
+                *[#lightyellow] fullGC
+                    *_ 触发条件 晋升失败/分配失败/并发标记周期未完成
+                    *_ 单线程;stw;压缩算法,整理碎片
+                *[#lightyellow] SATB (Snapshot at the beginning)
+                    *_ 三色标记法:黑色(根对象,或者对象和其子对象都被扫描),白色不可达,灰色(本身被扫描,但其子对象还未扫描)
+                    *_ 问题:并发标记,如果一个对象被标记为不可达后,又被引用了,如何处理?
+                    * 工作流程
+                        *_ initial mark:stw,标记所有GC roots直接引用的对象(存活对象),此时堆的状态即为快照
+                        *_ 并发标记: 遍历标记初始快照中的对象图;新分配的对象一律视为存活;写屏障记录:若一个对象引用被修改,标记旧值为待扫描
+                        *_ final remark:stw,处理satb缓冲区,扫描并发阶段被覆盖的旧引用;重新扫描GC roots的增量变化
+                    * 与incremental update(CMS)对比
+                        *_ 标记目标:SATB标记开始时所有存活对象(快照);incremental update标记结束时所有存活对象(实时更新)
+                        *_ 写屏障触发时机:SATB记录旧值,incremental update记录新值
+                        *_ 漏标(Missed Marking本应存活的对象被判断为垃圾)风险:SATB无,快照对象必存活,incremental update有(若新引用未被扫描)
+                        *_ 浮动垃圾:SATB多(新对象一律存活),incremental update少,新对象可以即时回收
+                        *_ 重新标记开销:SATB低(仅处理被覆盖的旧引用),incremental update高(需扫描所有新增引用)
+                        *_ 适合场景:SATB大堆、低延迟优先,incremental update中小堆,吞吐量优先
+            *[#lightgreen] fullGC原因
+                *_ 年轻代晋升老年代,老年代剩余空间不足
+                *_ 老年代使用率超过阈值
+                *_ 元空间(1.7永久代)不足
+                *_ 调用System.gc()
+            *[#lightgreen] ThreadLocal内存泄漏
+                *_ ThreadLocal是基于ThreadLocalMap实现的,Entry的key使用了WeakReference封装
+                *_ 弱引用类型若不可达,下次GC一定被回收,空间够也回收
+                *_ key被回收后,存在引用链路:Thread->ThreadLocalMap->Entry->Value,所以value不会被回收,导致泄漏
+                *_ 常见的case是线程池,这样线程生命周期长
+                *_ 解决方式是手动remove
     *[#pink] 7数据库性能调优
         *[#lightblue] 如何写高性能SQL
             *[#lightgreen] 慢SQL
