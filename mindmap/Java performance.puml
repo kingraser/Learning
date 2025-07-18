@@ -203,22 +203,64 @@
                 * redlock算法
                     *_ 集群模式下,超过一半节点成功&耗时小于lock_timeout则获得锁成功
         *[#lightblue] 分布式事务
-            * XA规范
-                *_ DTP模型:AP/RM/TM
-                *_ 父节点(持久)下建立子节点,并标记有序性
-            * 二/三阶段提交
-                *_ prepare commit
-                *_ 准备/预处理/提交或者回滚
-            * TCC
+            *[#lightgreen] XA规范
+                *_ DTP模型:AP(Application Program)/RM(Resource Manager)/TM(Transaction Manager)
+                *_ Spring JTA框架即应用了XA协议
+            *[#lightgreen] 二/三阶段提交
+                * 二阶段:prepare commit
+                    *_ prepare时间长的话,长时间占用资源
+                    *_ commit有的节点未成功,导致数据不一致
+                * 准备/预处理/提交或者回滚
+                    *_ 加了一个阶段,询问各节点可否执行任务
+            *[#lightgreen] TCC
                 *_ try/confirm/cancel
                 *_ 重试调用失败的confirm or cancel方法
-            * Seata
-                *_ TC/TM/RM
-                *_ DTP模型:AP/RM/TM
-                *_ DTP模型:AP/RM/TM
+                *_ 对业务入侵大,还需考虑幂等性
+            *[#lightgreen] Seata
+                *_ TC(Transaction Coordinator)/TM/RM
+                *_ 第一阶段就commit,因为认为成功是大概率,减少资源占用时间
+                *_ 同步生成回滚sql
+                *_ TC维护全局写排它锁,默认级别是读未提交
         *[#lightblue] 缓存
+            *[#lightgreen] client端
+                *[#lightyellow] 协商缓存
+                    *_ 通过和server协商决定是否用缓存
+                    * if_modified_since/last_modified
+                        *_ server端返回头带有last_modified
+                        *_ client端请求set header:if_modified_since=last_modified
+                        *_ if相同 then server端直接返回304响应码
+                    * if_none_match/ETag
+                        *_ server端返回带有ETag
+                        *_ client再次请求set header:if_none_match=ETag
+                        *_ if相同 then server端直接返回304响应码
+                *[#lightyellow] 强缓存
+                    *_ Expires 绝对时间
+                    *_ Cache-Control相对时间
+            *[#lightgreen] 网关缓存 CDN(常用于视频)
+            *[#lightgreen] server端
+                *_ java进程缓存:GuavaCache/EhCache/Caffeine
+                *_ 分布式缓存 Redis
+            *[#lightgreen] 一致性
+                *_ 一般先删除cache,再删DB
+                *_ 更新频繁且对一致性有强要求的case不建议用
+            *[#lightgreen] 问题
+                * 穿透
+                    *_ 大量查询没有命中,去查DB
+                    *_ 把查到的空值放进去
+                    *_ BloomFilter
+                *_ 击穿 热点key失效,流量全部到DB
+                *_ 雪崩 大规模失效
         *[#lightblue] 抢购
+            *_ 商品详情页静态化+CDN
+            *_ 倒计时用client时间
+            *_ 获取购买资格用分布式锁
+            *_ 限流:Nginx
+            *_ 流量削峰:等待队列
+            *_ 补偿兜底策略
     *[#pink] 9结束语
+        *_ 基础功底
+        *_ 实践能力为重
+        *_ 多分享:费曼学习法
 left side
     *[#pink] 3Java编程性能调优
         *[#lightblue] String优化
