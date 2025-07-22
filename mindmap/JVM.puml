@@ -50,26 +50,127 @@
                 *_ 静态方法
                 *_ 常量标记+赋值
         *[#lightblue] 如何执行方法调用上
-            *[#lightgreen] 重载(静态绑定)
-                *_ 不考虑对基本类型自动装拆箱以及可变长参数选取
-                *_ 允许自动装拆箱,但不允许可变长参数选取
-                *_ 允许自动装拆箱以及可变长参数选取
-                *_ 多个方法匹配,选取最贴切的,重点考虑参数类型的继承关系
-            *[#lightgreen] 重写(动态绑定)
-                * 子类和父类有名字+参数列表均相同的方法
+            *[#lightgreen] 重载与重写
+                * 重载:方法名相同,参数不同
+                    *_ 不考虑对基本类型自动装拆箱以及可变长参数选取
+                    *_ 允许自动装拆箱,但不允许可变长参数选取
+                    *_ 允许自动装拆箱以及可变长参数选取
+                    *_ 多个方法匹配,选取最贴切的,重点考虑参数类型的继承关系(子类参数认为更贴切)
+                * 重写:方法名相同,参数也相同(父子类)
                     *_ 静态情况下,子类隐藏了父类方法
                     *_ 非静态&&非私有,子类重写了父类方法
+            *[#lightgreen] JVM调用
+                *_ invokeStatic(静态方法)
+                *_ invokeSpecial(私有方法,构造器;super调用父类方法;接口default方法)
+                *_ invokeVirtual(非私有方法,并且这些方法支持多态)
+                *_ invokeInterface(接口方法,因为接口有多个实现类,调用需搜索具体实现类,效率比invokeVirtual低)
+                *_ invokeDynamic(支持JVM上动态类型语言,lambda表达式和方法引用)
         *[#lightblue] 如何执行方法调用下
+            *_ 静态绑定实际引用是方法指针,动态绑定是方法索引表
+            *[#lightgreen] 优化
+                * 内联缓存(inlining cache)
+                    *_ 单态monomorphic
+                    *_ 多态polymorphic,二态bimorphic是其中一种
+                    *_ 超多态megamorphic
+                *_ 方法内联(method inlining)
         *[#lightblue] 如何处理异常
+            *_ 在编译生成的字节码中,每个方法都附带一个异常表.
+            *_ 异常表中的每一个条目代表一个异常处理器,并且由from指针、to指针、target指针以及所捕获的异常类型构成
+            *_ 这些指针的值是字节码索引(bytecode index，bci),用以定位字节码
+            *_ from指针和to指针标示了该异常处理器所监控的范围,例如try代码块所覆盖的范围
+            *_ target指针则指向异常处理器的起始位置,例如catch代码块的起始位置
+            *_ JVM复制finally代码块的内容,分别放在try-catch代码块所有正常执行路径以及异常执行路径的出口中
+            *_ 如果catch处理里有异常,抛出的是处理的异常
+            *_ Suppressed异常:允许异常上附带异常信息
+            *_ try with resource
+            *_ catch代码块中捕获多种异常,用|分隔
         *[#lightblue] 如何实现反射
+            *[#lightgreen] 实现
+                *_ 本地实现和委派实现
+                *_ 第一次调用委派实现,委派本地实现
+                *_ 本地实现通过JVM内部调用目标方法
+                *_ 动态实现通过生成字节码调用内部方法(比本地实现快20倍,因为没有java到c++再到java的切换,但字节码生成很耗时)
+                *_ inflation机制在调用次数达到阈值切换委派实现为动态实现
+            *[#lightgreen] 开销
+                *_ 变长参数导致的object数组
+                *_ 基本类型的自动装箱拆箱
+                *_ 方法内联
+            *[#lightgreen] 优化
+                *_ 扩大Integer缓存范围
+                *_ 循环外构造参数数组直接传递给反射调用(但可能破坏逃逸分析,使得性能反而下降)
+                *_ 提高JVM关于每个调用能够记录的类型数目(默认2)
+                *_ 误扰Method.invoke方法的类型profile,会导致性能下降
         *[#lightblue] 如何实现invokeDynamic上
         *[#lightblue] 如何实现invokeDynamic下
         *[#lightblue] 对象的内存布局
         *[#lightblue] 垃圾回收上
+            *[#lightgreen] 如何确认什么需要回收
+                * 引用计数法
+                    *_ 引用指向某一对象,该对象引用计数+1;引用被指向其他值,该对象计数-1
+                    *_ 需要额外空间计数;无法处理循环引用的对象
+                * 可达性分析
+                    *_ GC roots可达对象放入live set,此过程被称为标记Mark
+                    *[#lightyellow] GC roots
+                        *_ Java 方法栈桢中的局部变量
+                        *_ 已加载类的静态变量
+                        *_ JNI handles
+                        *_ 已启动且未停止的Java线程
+                    *_ 误标:问题不大,下次回收即可
+                    *_ 漏标:问题很大,可能导致JVM崩溃
+            *[#lightgreen] stop the world
+                *_ 通过safepoint实现,等所有线程都到safepoint
+                *_ 对解释执行,字节码与字节码之间皆可作为安全点
+                *_ 对于机器码,HotSpot虚拟机的做法便是在生成代码的方法出口以及非计数循环的循环回边(back-edge)处插入安全点检测
+                *_ 如果长时间不进行safepoint检测,则gc等待safepoint时间变长
+                *_ 如果频繁进行safepoint检测,有额外开销
+            *[#lightgreen] 回收方式
+                *_ sweep:简单;有内存碎片+分配效率低(连续可以类似数组,碎片只能链表化)
+                *_ compact:无碎片;开销大
+                * copy:无碎片;内存使用效率低
+                    *_ 内存分成两个部分,用from,to两个指针维护
+                    *_ 使用from分配内存
+                    *_ 将from复制到to的内存区域
+                    *_ 交换from和to的指针内容
         *[#lightblue] 垃圾回收下
-left side
+            *_ 大部分对象只活很少时间,少部分幸存对象会活很久
+            *[#lightgreen] TLAB(Thread Local Allocation Buffer)
+                *_ 每个线程向JVM申请一段连续内存,私有,该操作加锁
+                *_ 维护两个指针,一个头一个尾,new通过指针加法实现,加法后如果超过尾,则重新申请
+            *_ 新生在Eden;minorGC存活去survivor
+            *[#lightgreen] CardTable
+                *_ 512字节,如果有指向新生代的引用,该卡dirty
+                *_ minorGC,不需要扫描全部老年代,只扫描dirty cards,加入GC roots,扫完脏卡标志清0
+                *_ 需要截获所有引用型实例变量的写操作,解释型好实现
+                *_ 机器码需要写屏障,有额外开销,但是能加大MinorGC吞吐率
+                * 可能有false sharing问题
+                    *_ G1维护了一个脏卡队列,更新时写入本地队列而不是全局卡表,定期刷新队列到全局卡表left side
     *[#pink] 2高效编译
+        *[#lightblue] 常用工具介绍
+        *[#lightblue] 内存模型
+        *[#lightblue] 如何实现synchronized
+        *[#lightblue] 语法糖与编译器
+        *[#lightblue] 即时编译上
+        *[#lightblue] 即时编译下
+        *[#lightblue] 即时编译器的中间表达形式
+        *[#lightblue] 字节码(基础篇)
+        *[#lightblue] 方法内联上
+        *[#lightblue] 方法内联下
+        *[#lightblue] hotspot虚拟机的intrinsic
+        *[#lightblue] 逃逸分析
     *[#pink] 3代码优化
+        *[#lightblue] 字段访问
+        *[#lightblue] 循环
+        *[#lightblue] 向量化
+        *[#lightblue] 注解处理器
+        *[#lightblue] 基准测试框架JMH上
+        *[#lightblue] 基准测试框架JMH下
+        *[#lightblue] Java虚拟机的监控及诊断工具(命令行篇)
+        *[#lightblue] Java虚拟机的监控及诊断工具(GUI篇)
+        *[#lightblue] JNI运行机制
+        *[#lightblue] JavaAgent与字节码注入
 right side
     *[#pink] 4黑科技
+        *[#lightblue] Graal:用java编译java
+        *[#lightblue] Truffle:语言实现框架
+        *[#lightblue] SubstrateVm:AOT编译框架
 @endmindmap
