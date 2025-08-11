@@ -101,8 +101,41 @@
                 *_ 提高JVM关于每个调用能够记录的类型数目(默认2)
                 *_ 误扰Method.invoke方法的类型profile,会导致性能下降
         *[#lightblue] 如何实现invokeDynamic上
+            *[#lightgreen] 方法句柄MethodHandle
+                *_ 强类型,能够直接被执行的引用
+                *_ 类型由入参类型和返回类型,唯一确定
+                *_ 通过MethodHandles.lookup类完成
+                *_ 创建时检查权限,此后不再检查,所以相比重复检查的反射,性能会更好
+                *_ 权限检查不在MethodHandle的创建位置,在lookup对象的创建位置
+                *_ 通过invokeExact(入参类型与声明严格匹配,严格到子类不能传入父类的声明)以及invoke来调用
+                *_ 和反射一样,都是间接调用,同样会面对无法内联的问题
         *[#lightblue] 如何实现invokeDynamic下
-        *[#lightblue] 对象的内存布局
+            *_ 抽象出调用点的概念,并调用该调用点链接的方法句柄
+            *_ 第一次生成并绑定调用点,后续直接调用已经绑定的方法
+            *_ 没有捕获的lambda,始终返回同一个适配器类的实例,捕获的每次都是新的实例
+            *_ 所以应该尽可能使用非捕获式,不过捕获式也可能借助逃逸分析,避免实际新建适配器类实例的操作
+        *[#lightblue] 对象的内存布局TODO
+            *[#lightgreen] 新建object方式
+                * new 构造方法
+                    *_ 无则自动添加无参构造器
+                    *_ 子类需要先调用父类构造器
+                    *_ 父类无无参构造器,子类需要显示调用父类带参数构造器
+                *_ 反射机制 构造方法
+                *_ clone 复制已有数据
+                *_ 反序列化 复制已有数据
+                *_ Unsafe.allocateInstance方法 不初始化实例字段
+            *[#lightgreen] object内存布局
+                *[#lightyellow] 对象头
+                    *_ 标记字段 64位:如hash码,gc信息,锁信息
+                    * 类型指针 64位:指向该对象的类
+                        * 压缩指针
+                            *_ 64位压缩到32位
+                            *_ 压缩指针原理:大部分类型都超过1byte,以2byte为最小单位组织内存寻址
+                            *_ 内存对齐 默认为8,即至少需要8个字节,少了则浪费
+                * 字段重排列
+                    *_ 排列方法:如果一个field占据n个字节,偏移量要是n的倍数;子类继承字段的偏移量和父类对应字段的偏移量一致
+                    *_ false sharing问题:两个字段恰好在一个缓存行,对一个字段操作导致整行写回
+                    *_ @Contented注释 处在独立的缓存行,有空间浪费
         *[#lightblue] 垃圾回收上
             *[#lightgreen] 如何确认什么需要回收
                 * 引用计数法
@@ -147,11 +180,97 @@
     *[#pink] 2高效编译
         *[#lightblue] 常用工具介绍
         *[#lightblue] 内存模型
+            *[#lightgreen] happens-before
+                *_ 同一线程中的顺序性,前面操作结果对后面可见
+                *_ volatile的写操作对后续读操作可见
+                *_ 传递性 A before B & B before C => A before C
+                *_ Monitor中lock的解锁对后续加锁可见
+                *_ 线程start规则 线程A中start线程B,B能看见A在startB之前的操作结果
+                *_ 线程join规则 线程A中等待子线程B完成(join),A能看到B的操作结果
+            *[#lightgreen] 实现(Memory Barrier)
+                *_ 插入相应的Memory Barrier
+                *_ 对X86,读读/读写/写写是空指令,写读有具体指令
+            *_ volatile 强制刷新缓存
+            *_ final写操作后插入写写屏障,防止重排序至final字段写之前
+            *_ safe publication:对象被完全初始化后,其他线程才能访问它;实现static/volatile/final/lock
         *[#lightblue] 如何实现synchronized
+            *_ 字节码monitorenter/monitorexit来持有/释放monitor对象
+            *_ monitor可以和对象一起创建/销毁,由c++ObjectMonitor实现
+            *_ monitor由操作系统mutex lock实现互斥,会导致内核态/用户态切换,cost高
+            *_ 对象实例在内存中的三部分:对象头/实例数据/对齐填充
+            *_ 对象头由mark word/指向类的指针/数组长度三部分组成
+            *[#lightgreen] mark word64bit
+                *_ 无锁 25bit unused+31bit hashCode+1bit unused+4bit age分代年龄+1bit 是否偏向锁(0)+2bit锁标识位(01)
+                *_ 偏向锁 54bit 线程ID+2bit Epoch+1bit unused+4bit age分代年龄+1bit 是否偏向锁(1)+2bit锁标识位(01)
+                *_ 轻量级锁 62bit指向轻量级锁的指针+2bit锁标识位(00)
+                *_ 重量级锁 62bit指向重量级锁的指针+2bit锁标识位(10)
+                *_ GC标记 62bit空+2bit锁标识位(11)
+            *[#lightgreen] Epoch
+                *_ 偏向锁有竞争时会撤销,撤销麻烦,需要持有线程到达安全点,再替换为轻量锁
+                *_ epoch最新值放在类的元数据里,对象头存储当前epoch
+                *_ 如果不匹配说明(以类为维度)锁竞争激烈
+            *_ 偏向锁优化同一线程多次申请同一个锁的竞争
+            *_ 大量线程竞争同一资源会导致偏向锁频繁被撤销,可以通过调整JVM参数禁用偏向锁或使用重量级锁
+            *_ 偏向锁竞争先用CAS获取锁,若失败升级为轻量级锁
+            *_ 轻量级锁适合不存在长时间竞争的场景,可以调整JVM参数调整是否关闭自旋
+            *_ 自旋尝试多次仍无法获取锁,升级到重量级锁,未抢到锁的线程会阻塞进入wait_set
+            *_ 动态编译实现锁粗化/锁消除
+            *_ 编码可以细化锁粒度
         *[#lightblue] 语法糖与编译器
+            *[#lightgreen] 自动拆装箱
+                *_ Integer.valueOf/intValue
+            *[#lightgreen] 范型
+                *_ 选取该泛型所能指代的所有类中层次最高的那个,作为替换泛型的类
+            *[#lightgreen] 桥接方法
+                *_ 重写了父类的同名同方法描述符的方法
         *[#lightblue] 即时编译上
+            *[#lightgreen] 编译器分类
+                *_ C1 client
+                *_ C2 server(实现语言C++)
+                *_ Graal(实现语言Java,替换C2,17成为默认)
+            *[#lightgreen] 分层编译
+                * 层数
+                    *_ 解释执行
+                    *_ 不带profiling的C1(终止状态)
+                    *_ 仅带方法次数调用和循环回边计数profiling的C1
+                    *_ 带所有profiling的C1
+                    *_ C2(终止状态)
+                *_ 性能:C2>C1(1)>C1(2)>C1(3)
+                *_ C2性能高于C1 30%,C1(2)又高于C1(3) 30%,主要是profiling有额外开销
+            *[#lightgreen] 即时编译触发
+                *_ 调用次数和回边执行次数
+                * 动态调整阈值
+                    *_ 系数s=queue_size_X/(TierXLoadFeedback*compiler_count_X)+1
+                    *_ 其中X是执行层次,可取3或者4
+                    *_ queue_size_X是执行层次为X的待编译方法的数目
+                    *_ TierXLoadFeedback是预设好的参数,其中Tier3LoadFeedback为5,Tier4LoadFeedback为3
+                    *_ compiler_count_X是层次X的编译线程数目
+            *[#lightgreen] OSR(On-Stack-Replacement)编译
+                *_ 循环回边计数器
+                *_ 解决单次调用包含热循环的性能优化问题
         *[#lightblue] 即时编译下
+            *[#lightgreen] profiling
+                *_ branch profile
+                *_ receiver type profile
+                *_ 解释过程没有profile,C1后,JVM认为该方法有可能被C2编译,方才在该方法的C1代码中收集这些profile
+                *_ C2可以根据收集得到的数据进行猜测,假设接下来的执行同样会按照所收集的profile进行,从而作出比较激进的优化
+            *[#lightgreen] 基于分支的profiling
+                *_ 未执行过的分支被剪枝
+            *[#lightgreen] 基于类型的profiling
+                *_ compiler假设动态类型只有profile中的那几个
+            *[#lightgreen] 去优化
+                *_ 退回解释执行
+                *_ 插入陷阱(在被剪枝的分支)进行去优化
+                *_ 根据去优化的原因决定是否保留机器码和何时重新编译Java方法
         *[#lightblue] 即时编译器的中间表达形式
+            *[#lightgreen] IR(Intermediate Representation)
+                *_ java字节码
+                *_ 即时编译器会将Java字节码转换成SSA(Static Single Assignment) IR
+            *[#lightgreen] sea-of-nodes
+                *_ 节点调度
+                *_ 内存依赖
+            *[#lightgreen] GVN(Global Value Numbering)
+                *_  IR图上的公共子表达式消除(Common Subexpression Elimination,CSE)
         *[#lightblue] 字节码(基础篇)
         *[#lightblue] 方法内联上
         *[#lightblue] 方法内联下
