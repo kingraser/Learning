@@ -270,24 +270,126 @@
                 *_ 节点调度
                 *_ 内存依赖
             *[#lightgreen] GVN(Global Value Numbering)
-                *_  IR图上的公共子表达式消除(Common Subexpression Elimination,CSE)
+                *_ IR图上的公共子表达式消除(Common Subexpression Elimination,CSE)
         *[#lightblue] 字节码(基础篇)
+            *[#lightgreen] 加载常量
+                *_ iconst [-1,5]
+                *_ bipush [-128,127]
+                *_ sipush [-32768,32767]
+                *_ ldc any int value
+                *_ fconst any float value
+                *_ dconst any double value
+                *_ aconst reference
+            *[#lightgreen] 操作数栈
+                *_ dup 复制栈顶
+                *_ pop 弹出栈顶
+                *_ swap 交换栈顶
+            *[#lightgreen] 局部变量区访问
+                *_ iload 加载(至操作数栈)int
+                *_ istore 存储(回局部变量数组)int
+                *_ aload reference加载
+                *_ astore reference存储
+                *_ iinc 增加,常用于循环自增量更新
+            *[#lightgreen] Java相关
+                *_ new
+                *_ instanceof
+                *_ checkcast
+                *_ athrow
+                *_ monitorenter
+                *_ monitorexit
+            *[#lightgreen] 字段访问
+                *_ getstatic
+                *_ putstatic
+                *_ getfield
+                *_ putfield
+            *[#lightgreen] 方法调用
+                *_ invokestatic
+                *_ invokevirtual
+                *_ invokespecial
+                *_ invokeinterface
+                *_ invokedynamic
+            *[#lightgreen] 数组相关
+                *_ newarray
+                *_ anewarray
+                *_ multianewarray
+                *_ arraylength
+            *[#lightgreen] 控制流
+                *_ goto
+                *_ tableswitch
+                *_ lookupswitch
+                *_ 条件跳转
+                *_ 返回
+            *[#lightgreen] 计算
         *[#lightblue] 方法内联上
+            *_ 在编译过程中,将目标方法的方法体纳入编译范围之中,并取代原方法调用的优化手段
+            *[#lightgreen] 优势
+                *_ 消除调用本身带来的性能开销
+                *_ 触发更多优化
+            *[#lightgreen] 过程
+                *_ 解析字节码
+                *_ 生成IR图
+                *_ 内联目标方法的IR图到调用着方法的IR图里
+            *[#lightgreen] 属性
+                *_ 内联越多,性能越高
+                *_ 内联越多,编译时间越长
+                *_ 生成机器码越长,越容易填满Code Cache,导致即时编译被关闭
+                * 内联规则
+                    *_ 强制内联
+                    *_ 强制不内联
+                    *_ 方法调用层数
+                    *_ 程序路径的热度
+                    *_ 目标方法的调用次数和大小
+                    *_ 当前IR图的大小
         *[#lightblue] 方法内联下
         *[#lightblue] hotspot虚拟机的intrinsic
         *[#lightblue] 逃逸分析
     *[#pink] 3代码优化
         *[#lightblue] 字段访问
+            *[#lightgreen] 逃逸分析
+                *_ 锁消除
+                *_ 栈上分配
+                * 标量替换
+                    *_ 对象拆散为字段
+                    *_ 替换对象字段访问为局部变量访问
+            *[#lightgreen] 字段读取优化
+                *_ 缓存字段存储节点的值
+                *_ 替换字段读取节点为缓存值
+                *_ 缓存值失效时采取保守策略
+                *_ 优化实例字段和静态字段访问
+            *[#lightgreen] 字段存储优化
+                *_ 消除冗余的存储节点
+                *_ 消除冗余存储操作
+                * 冗余存储操作消除条件
+                    *_ 两次存储间没有读取
+                    *_ 被标记为volatile字段
+            *[#lightgreen] 死代码消除
+                *_ 死存储消除
+                *_ 部分死存储消除(if/else分支)
+                *_ 不可达分支消除
         *[#lightblue] 循环
+            *_ 循环无关code外提
+            *_ 循环展开
+            *_ 循环判断外提
+            *_ 循环剥离
         *[#lightblue] 向量化
+            *_ 向量化优化借助CPU的SIMD指令(单条指令控制多组数据的运算,cpu指令级别并行)
+            *_ HotSpot虚拟机使用HotSpot intrinsic和自动向量化两种方式
+            *_ 自动向量化的自适配性取决于循环回边的执行次数和方法的执行次数
         *[#lightblue] 注解处理器
+            *_ 修改已有的java源文件或生成新的java源文件
+            * 原理
+                *_ 将源文件解析为抽象语法树
+                *_ 调用已经注册的注解处理器
+                *_ 生成字节码
+            *_ Processor接口;抽象类AbstractProcessor
+            *[#lightgreen] 注解处理器
         *[#lightblue] 基准测试框架JMH上
         *[#lightblue] 基准测试框架JMH下
         *[#lightblue] Java虚拟机的监控及诊断工具(命令行篇)
         *[#lightblue] Java虚拟机的监控及诊断工具(GUI篇)
         *[#lightblue] JNI运行机制
         *[#lightblue] JavaAgent与字节码注入
-right side
+left side
     *[#pink] 4黑科技
         *[#lightblue] Graal:用java编译java
         *[#lightblue] Truffle:语言实现框架
