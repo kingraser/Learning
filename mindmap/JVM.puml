@@ -114,7 +114,7 @@
             *_ 第一次生成并绑定调用点,后续直接调用已经绑定的方法
             *_ 没有捕获的lambda,始终返回同一个适配器类的实例,捕获的每次都是新的实例
             *_ 所以应该尽可能使用非捕获式,不过捕获式也可能借助逃逸分析,避免实际新建适配器类实例的操作
-        *[#lightblue] 对象的内存布局TODO
+        *[#lightblue] 对象的内存布局
             *[#lightgreen] 新建object方式
                 * new 构造方法
                     *_ 无则自动添加无参构造器
@@ -341,8 +341,43 @@
                     *_ 目标方法的调用次数和大小
                     *_ 当前IR图的大小
         *[#lightblue] 方法内联下
+            *_ 对于需要动态绑定的虚方法调用,需要先去虚化,再进行方法内联
+            *[#lightgreen] 完全去虚化
+                * 基于类型推导
+                    *_ 数据流分析
+                    *_ sea-of-nodes IR
+                * 基于类层次分析
+                    *_ 设定一些assumption
+                    *_ 类加载时验证
+                    *_ final可以去除assumption
+            *[#lightgreen] 条件去虚化
+                *_ 基于类型profile的类型比较
+                * 若匹配不到
+                    *_ 完整的类型profile:去优化,重新收集profile
+                    *_ 不完整的类型profile:重新收集意义不大,直接虚调用
         *[#lightblue] hotspot虚拟机的intrinsic
+            *_ @HotSpotIntrinsicCandidate注解
+            *_ 实现方式
+                *_ 桩程序,解释器/编译器都能用,直接替换
+                *_ 特殊的IR节点,只有编译器能用.内联过程中,替换IR节点
+            * 依赖CPU指令
+                *_ 加法判断是否溢出
+                *_ StringLatin1.indexOf SIMD指令(Single Instruction Multiple Data)
+                *_ Integer.bitCount
+                *_ Thread.currentThread方法
+                *_ Unsafe.compareAndSwap方法
         *[#lightblue] 逃逸分析
+            *_ 一种确定指针动态范围的静态分析,在程序的哪些地方可以访问到指针
+            *[#lightgreen] 依据
+                *_ 一是对象是否被存入堆中(静态字段或者堆中对象的实例字段)
+                *_ 二是对象是否被传入未知代码中
+            *[#lightgreen] 优化
+                *_ 锁消除
+                *_ 标量替换
+                *_ 栈上分配
+            *[#lightgreen] 部分逃逸分析
+                *_ 与控制流有关
+                *_ 判断新建对象仅在部分分支中逃逸,将对象的新建操作推延至对象逃逸的分支中
     *[#pink] 3代码优化
         *[#lightblue] 字段访问
             *[#lightgreen] 逃逸分析
@@ -382,7 +417,6 @@
                 *_ 调用已经注册的注解处理器
                 *_ 生成字节码
             *_ Processor接口;抽象类AbstractProcessor
-            *[#lightgreen] 注解处理器
         *[#lightblue] 基准测试框架JMH上
         *[#lightblue] 基准测试框架JMH下
         *[#lightblue] Java虚拟机的监控及诊断工具(命令行篇)
