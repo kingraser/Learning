@@ -179,6 +179,15 @@
                     *_ G1维护了一个脏卡队列,更新时写入本地队列而不是全局卡表,定期刷新队列到全局卡表left side
     *[#pink] 2高效编译
         *[#lightblue] 常用工具介绍
+            *[#lightgreen] javap class文件反汇编成人类可读模式(字节码)
+                *_ -p 包含私有字段/方法
+                *_ -v 尽可能打印所有信息
+            *[#lightgreen] OpenJDK项目的Code Tools
+                *_ ASMTools:简单字节码修改,反汇编/汇编操作
+                *_ JOL:可用于查阅JVM中对象的内存分布
+            *[#lightgreen] ASM
+                *_ 字节码分析和修改框架
+                *_ 既可以生成新的class文件,也可以修改已有的class文件
         *[#lightblue] 内存模型
             *[#lightgreen] happens-before
                 *_ 同一线程中的顺序性,前面操作结果对后面可见
@@ -378,6 +387,7 @@
             *[#lightgreen] 部分逃逸分析
                 *_ 与控制流有关
                 *_ 判断新建对象仅在部分分支中逃逸,将对象的新建操作推延至对象逃逸的分支中
+left side
     *[#pink] 3代码优化
         *[#lightblue] 字段访问
             *[#lightgreen] 逃逸分析
@@ -418,12 +428,41 @@
                 *_ 生成字节码
             *_ Processor接口;抽象类AbstractProcessor
         *[#lightblue] 基准测试框架JMH上
+            *[#lightgreen] 性能测试偏差
+                *_ 容易忽视JVM/OS/硬件的影响
+                *_ 混杂了解释执行和即时编译生成code
+                *_ 循环优化导致数据偏差
+                *_ 电池管理策略,cpu缓存,分支预测器,超线程技术都可能影响结果
+            *[#lightgreen] JMH
+                *_ 内置功能控制即时编译器的优化
+                *_ 对于其他影响性能评测的因素,JMH也提供了不少策略来降低影响,甚至是彻底解决
+                *_ 借助JMH部署在maven上的archetype,生成maven项目模版
         *[#lightblue] 基准测试框架JMH下
+            *_ @Fork:新JVM,相对干净,提升准确度
+            *_ @BenchmarkMode:配置性能数据格式,比如平均时间
+            *_ @Warmup:预热迭代
+            *_ @Measurement:测试迭代
+            *_ @State:允许配置测试程序的状态
+            *_ @Setup:测试前准备
+            *_ @TearDown:测试后清理
+            *_ @CompilerControl:可以控制每个方法内联与否
+            *_ Blackhole类:它里边的consume方法可以防止即时编译器将所传入的值给优化掉
         *[#lightblue] Java虚拟机的监控及诊断工具(命令行篇)
         *[#lightblue] Java虚拟机的监控及诊断工具(GUI篇)
         *[#lightblue] JNI运行机制
+            *_ Java Native Interface(JNI)
+            *[#lightgreen] 链接方式
+                *_ JVM自动链接
+                *_ C代码主动链接
+            *[#lightgreen] JNI的API
+                *_ JNIENV
+                *_ 基本类型的对应关系
+                *_ 引用类型的数据结构
+            *[#lightgreen] 局部引用和全局引用
+                *_ 垃圾回收机制,标记不可回收
+                *_ JNI函数,可以消除全局/局部引用
+                *_ 句柄,保证GC移动对象后,依然可以被正确指向
         *[#lightblue] JavaAgent与字节码注入
-left side
     *[#pink] 4黑科技
         *[#lightblue] Graal:用java编译java
         *[#lightblue] Truffle:语言实现框架
