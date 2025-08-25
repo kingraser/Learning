@@ -448,7 +448,38 @@ left side
             *_ @CompilerControl:可以控制每个方法内联与否
             *_ Blackhole类:它里边的consume方法可以防止即时编译器将所传入的值给优化掉
         *[#lightblue] Java虚拟机的监控及诊断工具(命令行篇)
+            *[#lightgreen] jps:打印所有正在运行的Java进程的相关信息
+            *[#lightgreen] jstat:打印目标java进程的性能数据
+            *[#lightgreen] jmap:分析jvm堆中的对象
+            *[#lightgreen] jinfo:查看java进程的参数;修改目标java进程的"manageable"虚拟机参数
+            *[#lightgreen] jstack:打印java各个线程栈轨迹和持有的锁;经常用于死锁检测
+            *[#lightgreen] jcmd:替代jps,jmap,jinfo,jstack的功能
         *[#lightblue] Java虚拟机的监控及诊断工具(GUI篇)
+            *[#lightgreen] eclipse MAT
+                *_ 获取堆的二进制快照
+                * 三种获取方式
+                    *_ 使用Attach API
+                    *_ 新建一个JVM来运行Attach API
+                    *_ 使用jmap工具
+                * 计算对象占用内存的两种方式
+                    *_ Shallow heap:对象自身占据的内存
+                    *_ Retained heap:对象不再被引用时,GC回收的总内存
+                * 包括的视图
+                    *_ 直方图
+                    *_ 支配树
+            *[#lightgreen] Java Mission Control(JMC)
+                * Java Flight Recorder(JFR)
+                    *[#lightyellow] 事件类型
+                        *_ 瞬时:关心事件发生与否,例如异常;线程启动
+                        *_ 持续:关心持续时间,例如GC
+                        *_ 计时:关心时长超出阈值的持续事件
+                        *_ 采样:周期性采样,不需要进入安全点,更精确
+                    *[#lightyellow] 启动方式
+                        *_ 命令行参数
+                        *_ 使用jcmd的JFR.*子命令
+                        *_ JMC的JFR插件
+                * 可以查看MBean Server
+                    *_ JMX(JavaManagementExtensions)核心,JVM内注册表和代理器
         *[#lightblue] JNI运行机制
             *_ Java Native Interface(JNI)
             *[#lightgreen] 链接方式
@@ -463,6 +494,21 @@ left side
                 *_ JNI函数,可以消除全局/局部引用
                 *_ 句柄,保证GC移动对象后,依然可以被正确指向
         *[#lightblue] JavaAgent与字节码注入
+            *[#lightgreen] JavaAgent
+                *_ premain方法
+                *_ Attach API远程加载
+                *_ agentMain方法
+                *_ JVM不限制Agent的数量
+            *[#lightgreen] 字节码注入
+                *_ ClassFileTransformer接口
+                *_ ASM库的使用
+                *_ 观察者效应
+            *[#lightgreen] 基于字节码注入的profiler
+                *_ 利用字节码注入实现code覆盖工具,如Jacoco
+                *_ 利用字节码注入实现各式各样的profiler
+            *[#lightgreen] 面向切面编程
+                *_ 定义切入点和通知
+                *_ 字节码注入作为AOP的一种实现方式
     *[#pink] 4黑科技
         *[#lightblue] Graal:用java编译java
         *[#lightblue] Truffle:语言实现框架
